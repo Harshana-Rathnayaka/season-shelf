@@ -1,0 +1,10 @@
+node_modules/
+release/
+artifacts/
+.env*
+*.session*
+*.sqlite*
+*.part
+*.log
+credentials*
+.DS_Store

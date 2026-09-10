@@ -1,0 +1,44 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import {randomUUID} from "node:crypto";
+import {hashFile} from "../src/core/files.mjs";
+import {removePending, trashCompleted, orphanedPartials, trashOrphans} from "../src/core/maintenance.mjs";
+
+test("bulk queue removal keeps completed and finishing entries", () => {
+  const queue = {jobs:[{id:"1",status:"downloading"},{id:"2",status:"complete"},{id:"3",status:"transferring"}],
+    control(id,action){assert.equal(this.batching,true);assert.equal(action,"remove");this.jobs=this.jobs.filter(j=>j.id!==id);},pump(){}};
+  assert.equal(removePending(queue,["1","2","3"]),1);
+  assert.deepEqual(queue.jobs.map(j=>j.id),["2","3"]);
+});
+
+test("bulk saved deletion trashes verified files and retains changed ones", async t => {
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),"shelf-maintenance-"));
+  t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const first=path.join(dir,"first.mkv"), second=path.join(dir,"second.mkv");
+  await fs.writeFile(first,"original"); await fs.writeFile(second,"original");
+  const hash=await hashFile(first);
+  await fs.writeFile(second,"changed");
+  const queue={jobs:[{id:"1",status:"complete",finalPath:first,sha256:hash},{id:"2",status:"complete",finalPath:second,sha256:hash}],namingLocks:new Set(),seasonKey:()=>"season",save(){}};
+  const result=await trashCompleted(queue,["1","2"],file=>fs.rename(file,file+".recycled"));
+  assert.equal(result.deleted,1);assert.equal(result.failures.length,1);
+  assert.equal(queue.jobs[0].status,"deleted");assert.equal(queue.jobs[1].status,"complete");
+  assert.equal(await fs.readFile(second,"utf8"),"changed");
+  assert.equal(queue.namingLocks.size,0);
+});
+
+test("orphan cleanup protects tracked and still-running partial files", async t => {
+  const staging=await fs.mkdtemp(path.join(os.tmpdir(),"shelf-orphans-"));
+  t.after(()=>fs.rm(staging,{recursive:true,force:true}));
+  const [orphan,tracked,running]=[randomUUID(),randomUUID(),randomUUID()];
+  for(const id of [orphan,tracked,running]) await fs.writeFile(path.join(staging,id+".part"),"bytes");
+  await fs.writeFile(path.join(staging,"unrelated.txt"),"keep");
+  const queue={staging,jobs:[{id:tracked,status:"cancelled"}],running:new Map([[running,{}]])};
+  assert.deepEqual((await orphanedPartials(queue)).map(f=>f.id),[orphan]);
+  const result=await trashOrphans(queue,[orphan,tracked,running],file=>fs.rename(file,file+".recycled"));
+  assert.equal(result.deleted,1);
+  assert.equal(await fs.readFile(path.join(staging,tracked+".part"),"utf8"),"bytes");
+  assert.equal(await fs.readFile(path.join(staging,running+".part"),"utf8"),"bytes");
+});

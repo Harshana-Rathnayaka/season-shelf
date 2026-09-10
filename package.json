@@ -1,0 +1,45 @@
+{
+  "name": "season-shelf",
+  "productName": "Season Shelf",
+  "version": "0.1.0",
+  "description": "A local desktop companion for organising episodic Telegram downloads.",
+  "private": true,
+  "type": "module",
+  "main": "src/desktop/main.cjs",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node --test test/*.test.mjs",
+    "preview": "node scripts/preview.mjs",
+    "check": "node scripts/check.mjs",
+    "pack:win": "electron-builder --win portable --x64"
+  },
+  "dependencies": {
+    "big-integer": "1.6.52",
+    "teleproto": "1.229.0"
+  },
+  "devDependencies": {
+    "electron": "44.3.0",
+    "electron-builder": "^26.0.12",
+    "jsdom": "30.0.1"
+  },
+  "build": {
+    "appId": "local.seasonshelf.desktop",
+    "productName": "Season Shelf",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "artifactName": "Season-Shelf-${version}-${arch}.${ext}",
+    "publish": null
+  }
+}

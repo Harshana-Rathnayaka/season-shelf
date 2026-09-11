@@ -37,11 +37,11 @@ test("archive selects smallest 720p HEVC, watch prefers 1080p HEVC", () => {
   assert.equal(selectEpisodes(items, "watch")[0].size, 800);
   assert.deepEqual(selectEpisodes([items[2]], "archive"), []);
 });
-test("conflicting, multi-episode and unknown metadata are excluded", () => {
+test("conflicting, ambiguous episode ranges and unknown metadata are excluded", () => {
   for (const item of [
     episode("Show.S01E01.720p.x265.mkv", 200, "Show.S02E01.1080p.x264.mkv"),
-    episode("Show.S01E01E02.720p.x265.mkv"),
-    episode("Show.S01E01-02.720p.x265.mkv"),
+    episode("Show.S01E01E04.720p.x265.mkv"),
+    episode("Show.S01E02-01.720p.x265.mkv"),
     episode("Show.S01E01.mkv"),
   ]) {
     assert.ok(item.reason);
@@ -109,4 +109,14 @@ test("custom keyword filters accept literal words and disable when empty", () =>
 test("dash-dominant seasons normalize separators while retaining release tags", () => {
   const items=[episode("Show-S01E01-720p-WEB-DL-x265.mkv"),episode("Show-S01E02-720p-WEB-DL-x265.mkv"),episode("Show.S01E03.720p.WEB-DL.x265.mkv")];
   assert.equal(normalizeSeasonNames(items)[2].destinationFilename,"Show-S01E03-720p-WEB-DL-x265.mkv");
+});
+
+test("consecutive combined episodes meet quality rules and are selected once without duplicate singles",()=>{
+ const pair=episode("Prison.Break.S04E01E02.720p.BluRay.x265-HETeam.mkv");
+ assert.equal(pair.reason,null);assert.equal(pair.episodeEnd,2);
+ const items=selectEpisodes([pair,episode("Prison.Break.S04E01.720p.x265.mkv"),episode("Prison.Break.S04E02.720p.x265.mkv")]);
+ assert.equal(items.length,1);assert.equal(items[0].id,pair.id);
+ assert.equal(selectEpisodes([pair],"archive",{resolution:1080}).length,0);
+ assert.equal(episode("Show_S01E01-02_720p_x265.mkv").episodeEnd,2);
+ assert.ok(episode("Show.S01E01E02E03.720p.x265.mkv").reason);
 });

@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 const allowed = new Set([
   "bootstrap",
+  "window-theme",
   "connect",
   "auth-reply",
   "channels",

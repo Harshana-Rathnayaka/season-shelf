@@ -25,6 +25,7 @@ async function fixture(t, bootstrap = null, handler = null) {
   };
   const files = [
     "src/ui/icons.mjs",
+    "src/ui/discovery-flow.mjs",
     "src/core/appearance.mjs",
     "src/ui/appearance.mjs",
     "src/core/catalog.mjs",
@@ -260,11 +261,13 @@ test("appearance applies across pages and reset restores theme colours", async (
   assert.equal(f.document.documentElement.style.getPropertyValue('--accent'),'');
 });
 
-test("discovery sends only a submitted query and previews before joining", async (t) => {
+test("discovery sends only a submitted query and continues after explicit result selection", async (t) => {
   const f=await fixture(t,{settings:{theme:"dark"},channels:[],jobs:[]},async(method)=>{
     if(method==='discovery-source') return {source:{id:'source-token',title:'MovieClubFamily Chat',linked:true}};
     if(method==='discovery-search') return {messages:[{text:'Choose a result',links:[{id:'choice',label:'Banshee',kind:'public-peer'}]}]};
     if(method==='discovery-follow') return {channel:{id:'choice',title:'Banshee'}};
+    if(method==='discovery-join') return {channel:{id:'joined'},channels:[]};
+    if(method==='scan') return {channel:{id:'joined',title:'Banshee'},items:[]};
     return [];
   });
   f.click('[data-action="choose-series"]');
@@ -282,8 +285,22 @@ test("discovery sends only a submitted query and previews before joining", async
   assert.equal(f.calls.find(call=>call.method==='discovery-search').payload.sourceId,'source-token');
   f.click('[data-action="discovery-follow"]');
   await new Promise(resolve=>setTimeout(resolve,0));
-  assert.ok(f.document.querySelector('[data-action="discovery-join"]'));
-  assert.equal(f.calls.some(call=>call.method==='discovery-join'),false);
+  assert.ok(f.calls.some(call=>call.method==='discovery-join'));
+  assert.ok(f.calls.some(call=>call.method==='scan'));
+  assert.equal(f.document.querySelector('#dialog').open,false);
+  assert.match(f.document.querySelector('.library-panel h2').textContent,/Banshee/);
+});
+
+test("discovery failures replace the waiting overlay with an actionable visible error",async(t)=>{
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async(method)=>{
+    if(method==='discovery-source') throw new Error('Telegram request failed');
+    return [];
+  });
+  f.click('[data-action="choose-series"]');f.click('[data-action="discover"]');f.click('[data-action="discovery-source"]');
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(f.document.querySelector('#dialog').open,true);
+  assert.match(f.document.querySelector('#dialog [role="alert"]').textContent,/Telegram request failed/);
+  assert.ok(f.document.querySelector('#dialog [data-action="choose-series"]'));
 });
 
 test("all pages keep their heading outside the scroll pane and retain position on updates", async (t) => {
@@ -302,4 +319,17 @@ test("all pages keep their heading outside the scroll pane and retain position o
   }
   f.click('[data-page="settings"]');
   assert.doesNotMatch(f.document.querySelector('main').textContent,/Start with 2|Compare performance|npm start/);
+});
+
+test("account button opens an anchored popup with logout without navigating",async(t)=>{
+  const f=await fixture(t,{settings:{theme:'dark'},profile:{name:'Anonymous',username:'D3M0NHA2H'},jobs:[],channels:[]});
+  f.click('.profile');
+  assert.equal(f.document.querySelector('#account-popover').hidden,false);
+  assert.ok(f.document.querySelector('.library-shell'));
+  assert.match(f.document.querySelector('#account-popover').textContent,/@D3M0NHA2H/);
+  assert.ok(f.document.querySelector('#account-popover [data-action="disconnect"]'));
+  f.document.dispatchEvent(new f.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+  assert.equal(f.document.querySelector('#account-popover').hidden,true);
+  f.click('[data-page="settings"]');
+  assert.doesNotMatch(f.document.querySelector('main').textContent,/shade of dark|Anonymous \? @/);
 });

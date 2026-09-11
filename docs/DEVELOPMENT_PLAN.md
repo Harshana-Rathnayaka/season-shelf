@@ -16,7 +16,7 @@ NEXT_SESSION.md for the full handoff.
    or select its actual joined search group, show the posting destination, send
    one query, match the bot's replies to that query, follow the selected link,
    start the private bot, then preview/join/scan the chosen series channel.
-   Private message links remain a fallback. No live conversation was tested.
+   Private message links remain a fallback. Inline callbacks and automatic sole-result continuation are implemented; multiple results require selection. No live conversation was tested.
 4. **Reliability and review - targeted pass complete.** Atomic SQLite queue
    checkpoints; separate appearance, discovery and search-source modules.
    Larger page/IPC extraction remains in ARCHITECTURE_REVIEW.md.
@@ -26,7 +26,7 @@ NEXT_SESSION.md for the full handoff.
 
 ## Next development after acceptance
 
-- Callback pagination and subscription-task UX; preserve exact callback data.
+- Live acceptance of implemented callback URL/edited-keyboard handling; collect separate callback reply messages and improve subscription-task UX.
 - Forum topics, late/edited reply updates and attachment-contained links.
 - Alternate 1080p bot and bot-delivered file cataloging.
 - Per-series destination/quality, optional language/media probing and monitoring.

@@ -1,3 +1,7 @@
+## Follow-up implementation
+
+Automatic discovery sequencing is isolated in src/ui/discovery-flow.mjs with cancellation and redirect bounds. Callback payloads and peer context remain in the main-process Discovery service; the renderer receives opaque choice IDs. Windows title bar theme IPC accepts validated hex colours only, retaining native window buttons and existing sender checks. Larger renderer/page and IPC module extraction remains future work.
+
 # Architecture review — 11 September 2026
 
 ## Assessment

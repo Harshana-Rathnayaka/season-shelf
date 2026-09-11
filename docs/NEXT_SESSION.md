@@ -1,3 +1,27 @@
+## Toolbar, combined episodes and discovery recovery - 11 September 2026
+
+Queue bulk actions now share one compact wrapping toolbar; separate info controls removed. Supplemental action tooltips and existing deletion confirmations retain the explanations. Saved files uses the same button sizing. UX reference: https://www.nngroup.com/articles/tooltip-guidelines/
+
+Consecutive two-episode files (S04E01E02 or S04E01-02) are accepted only with valid quality/codec/size; larger, reversed or conflicting ranges remain excluded. Combined files display their range, preserve original names and are selected once without overlapping singles. Re-scan existing channels to refresh previously rejected records.
+
+Discovery errors now replace the waiting overlay with visible error/recovery controls. Successful joins switch to Library, close the dialog and clear the old series while scanning. Invite imports without a chat entity recheck the exact invite to retrieve scan identity. Live Telegram error cause from the screenshot is unconfirmed; no account operation was performed during development.
+
+77 tests pass, including missing-entity join recovery, dialog closure/new series rendering, visible failures and combined episodes. Syntax checks pass; sample preview rebuilt. Native visual acceptance and a real provider retry remain pending.
+
+## Inline button schema fix and compact action help - 11 September 2026
+
+Root cause confirmed in installed Teleproto README: layer 229 uses KeyboardInlineButton.type with InlineButtonTypeUrl/Callback; previous fixtures only exercised legacy button shapes. Parser now supports both schemas. Regression uses real installed Api constructors and exercises sole-result Start/join plus callback execution. Multiple-result selection remains covered. Live provider acceptance is still pending.
+
+Queue and saved-file action explanations are now compact info disclosures, available on hover, keyboard focus and click, preserving confirmation messages. Full suite: 74 tests pass; syntax checks pass; preview rebuilt.
+
+## Latest handoff - discovery buttons and compact workspace
+
+Implemented: re-fetch accepted bot replies by message ID to retrieve inline keyboards; preserve callback data and original message context; validate buttons before pressing; handle callback URLs and edited keyboards. Unsupported buttons remain visible. A sole eligible result continues through Start, channel join and scan; multiple results require selection. Navigation/subscription controls are excluded from automatic selection. Bare MCF bot links now continue to plain /start.
+
+Downloads and Saved files use matching 96px base summary tiles (scaled with text size) and compact rows retaining episode details. Account click opens an anchored popup with logout; Settings copy and account separator corrected. Windows uses a theme-matched 32px draggable title bar with native window buttons; restart Electron to load it.
+
+Validation: 73 tests and syntax checks pass. Preview rebuilt. No live Telegram messages/joins or personal-file deletions performed. Native/pixel-level appearance remains unverified. Test a real MCF search next; callbacks that send a separate new message rather than return a URL or edit their source message are not collected yet. Subscription gates, attachment-contained links, forums and alternate file bots remain future work. Earlier callback limitations below are superseded for supported URL/edited-keyboard callbacks.
+
 # Season Shelf ? current handoff
 
 ## Current implementation

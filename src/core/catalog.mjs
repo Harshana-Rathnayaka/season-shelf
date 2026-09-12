@@ -159,8 +159,9 @@ export function normalizeSeasonNames(items) {
   const votes = new Map();
   for (const item of items) {
     const {text} = protect(item.filename.replace(/\.[^.]+$/, ""));
-    const counts = [".", "_", "-"].map(separator => [separator, text.split(separator).length - 1]).sort((a,b) => b[1]-a[1]);
-    const vote = votes.get(item.season) || {".":0,"_":0,"-":0};
+    const votingText = text.replace(/\s*([._-])\s*/g, "$1").replace(/\s+/g, " ");
+    const counts = [".", "_", "-", " "].map(separator => [separator, votingText.split(separator).length - 1]).sort((a,b) => b[1]-a[1]);
+    const vote = votes.get(item.season) || {".":0,"_":0,"-":0," ":0};
     if (counts[0][1] > counts[1][1]) vote[counts[0][0]]++;
     votes.set(item.season, vote);
   }
@@ -169,7 +170,7 @@ export function normalizeSeasonNames(items) {
     if (counts[0][1] === counts[1][1]) return {...item,destinationFilename:item.filename};
     const ext=item.filename.match(/\.[^.]+$/)?.[0] || "";
     const {text,restore}=protect(item.filename.slice(0,item.filename.length-ext.length));
-    return {...item,destinationFilename:restore(text.replace(/[._-]/g,counts[0][0]))+ext};
+    return {...item,destinationFilename:restore(text.replace(/[._\s-]+/g,counts[0][0]))+ext};
   });
 }
 export function safeName(value, maxLength = 100) {
@@ -189,10 +190,10 @@ export function relativeDestination(series, item) {
   const filename = item.destinationFilename || item.filename;
   const ext = filename
     .match(/\.(mkv|mp4|avi|webm|m4v)$/i)?.[0];
-  if (!ext || !Number.isInteger(item.season) || !Number.isInteger(item.episode))
+  if (!ext || (!item.unverified && (!Number.isInteger(item.season) || !Number.isInteger(item.episode))))
     throw new Error("Invalid episode");
   return [
-    `Season ${pad(item.season)}`,
+    ...(item.unverified ? ["Unverified"] : [`Season ${pad(item.season)}`]),
     // Preserve every valid original character, including repeated spaces.
     // Only Windows-incompatible names need sanitizing before separator matching.
     /[<>:"/\\|?*\x00-\x1f]/.test(filename) || filename.length > 255 ||

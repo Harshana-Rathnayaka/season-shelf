@@ -23,7 +23,7 @@ const server = http.createServer(async (req, res) => {
     if (
       !target.startsWith(root) ||
       (!target.startsWith(path.join(root, "ui") + path.sep) &&
-        !["core/catalog.mjs", "core/progress.mjs", "core/appearance.mjs"].some(file => target === path.join(root, file)))
+        !["core/catalog.mjs", "core/collection.mjs", "core/progress.mjs", "core/appearance.mjs"].some(file => target === path.join(root, file)))
     ) {
       res.writeHead(403);
       return res.end();

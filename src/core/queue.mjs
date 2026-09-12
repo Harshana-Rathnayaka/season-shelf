@@ -63,7 +63,7 @@ export class DownloadQueue extends EventEmitter {
     const batchId = this.workBatch();
     for (const item of items) {
       if (
-        item.reason ||
+        (item.reason && !item.unverified) ||
         !item.peer ||
         !Number.isSafeInteger(item.size) ||
         item.size <= 0
@@ -137,13 +137,14 @@ export class DownloadQueue extends EventEmitter {
     }
   }
   async finishSeason(seed) {
+    if (seed.item.unverified) return;
     const key = this.seasonKey(seed);
     if (this.namingLocks.has(key)) return;
-    const group = this.jobs.filter(job => this.seasonKey(job) === key && !["cancelled", "deleted", "missing"].includes(job.status));
+    const group = this.jobs.filter(job => this.seasonKey(job) === key && !job.item.unverified && !["cancelled", "deleted", "missing"].includes(job.status));
     if (!group.length || group.some(job => job.status !== "complete")) return;
     this.namingLocks.add(key);
     try {
-      const eligible = group.filter(job => job.namingVersion === 2);
+      const eligible = group.filter(job => job.namingVersion === 2 && !job.item.unverified);
       const names = normalizeSeasonNames(eligible.map(job => job.item));
       for (let index = 0; index < eligible.length; index++) {
         const job = eligible[index];
@@ -199,6 +200,10 @@ export class DownloadQueue extends EventEmitter {
     this.pump();
   }
   pump() {
+    if (this.adapter.transferPolicy && !this.adapter.transferPolicy.allowed()) {
+      if(this.jobs.some(job=>job.speed)) {this.jobs.forEach(job=>{job.speed=0;});this.save();}
+      return;
+    }
     if (this.recovering || this.batching || this.stopped || Date.now() < (this.floodUntil || 0)) return;
     for (const job of this.jobs) {
       if (job.status === "retrying" && Date.now() >= job.retryAt)

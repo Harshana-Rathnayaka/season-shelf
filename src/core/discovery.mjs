@@ -71,7 +71,7 @@ export function discoveryLinks(message) {
     const key = JSON.stringify(target) + (target?.kind === "unsupported" ? candidate.label : "");
     if (!target || seen.has(key)) return [];
     seen.add(key);
-    const navigation = /^(?:[\s\p{P}\p{S}]*\d+\s*\/\s*\d+[\s\p{P}\p{S}]*|[\s\p{P}\p{S}]*)$/u.test(candidate.label) || /\b(next|previous|prev|back|page|subscribe|subscription|verify|request|join required)\b/i.test(candidate.label);
+    const navigation = /^(?:[\s\p{P}\p{S}]*\d+\s*\/\s*\d+[\s\p{P}\p{S}]*|[\s\p{P}\p{S}]*)$/u.test(candidate.label) || /\b(next|previous|prev|back|page|subscribe|subscription|verify|request|join|joined)\b/i.test(candidate.label);
     const ancillary = target.kind === "public-peer" && /(?:_chat$|^MovieClubFamily$)/i.test(target.username);
     return [{label:candidate.label.slice(0,200),target,automatic:target.kind !== "unsupported" && !navigation && !ancillary}];
   });

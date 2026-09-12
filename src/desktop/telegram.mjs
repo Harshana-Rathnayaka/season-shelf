@@ -1,3 +1,4 @@
+import { rangeSource } from "./range-source.mjs";
 import { TelegramClient, Api } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
 import bigInt from "big-integer";
@@ -125,7 +126,7 @@ export class TelegramAdapter {
     }
     return result;
   }
-  async scan(channel) {
+  async scan(channel, {minId=0,limit=10000} = {}) {
     const client = this.requireClient();
     const input = this.input(channel.peer);
     const entity = await client.getEntity(input);
@@ -133,7 +134,7 @@ export class TelegramAdapter {
       throw new Error("This channel restricts saving content");
     const items = [];
     let scanned = 0;
-    for await (const message of client.iterMessages(input, { limit: 10000 })) {
+    for await (const message of client.iterMessages(input, { limit, minId })) {
       scanned++;
       const doc = message.document;
       if (doc && !message.noforwards) {
@@ -158,7 +159,7 @@ export class TelegramAdapter {
       channel,
       items,
       scanned,
-      truncated: scanned >= 10000,
+      truncated: scanned >= limit,
       scannedAt: new Date().toISOString(),
     };
   }
@@ -179,50 +180,39 @@ export class TelegramAdapter {
     )
       throw new Error("Source attachment changed; rescan the channel");
     if (signal.aborted) return;
-    // Four bounded ranges per batch. At most 2 MiB is held per active file.
-    // Keep output in byte order so a partial file is always a contiguous prefix.
-    const block = 524288;
-    for (let base = offset; base < item.size; base += block * 4) {
-      if (signal.aborted) return;
+    // Refill one bounded slot as each ordered chunk is consumed; no batch barrier.
+    const block = 524288, controller = new AbortController();
+    const combined = AbortSignal.any([signal,controller.signal]);
+    const pending = new Map();
+    const source=rangeSource(client,message.media);
+    const read = async start => {
+      await this.transferPolicy?.acquire(Math.min(block,item.size-start),combined);
+      combined.throwIfAborted();
       if (Date.now() < (this.floodUntil || 0)) {
-        const error = new Error("FLOOD_WAIT: Telegram requested a pause");
-        error.seconds = Math.ceil((this.floodUntil - Date.now()) / 1000);
-        throw error;
+        const error=new Error("FLOOD_WAIT: Telegram requested a pause");
+        error.seconds=Math.ceil((this.floodUntil-Date.now())/1000);throw error;
       }
-      const offsets = [0, 1, 2, 3]
-        .map((i) => base + i * block)
-        .filter((start) => start < item.size);
-      const results = await Promise.allSettled(
-        offsets.map(async (start) => {
-          const chunks = [];
-          for await (const chunk of client.iterDownload(message.media, {
-            offset: bigInt(start),
-            requestSize: block,
-            limit: block,
-            signal,
-          }))
-            chunks.push(chunk);
-          const data = Buffer.concat(chunks);
-          if (data.length !== Math.min(block, item.size - start))
-            throw new Error("Incomplete range received from Telegram");
-          return data;
-        }),
-      );
-      const failure = results.find((result) => result.status === "rejected");
-      if (failure) {
-        if (
-          /FLOOD/i.test(failure.reason?.message || "") &&
-          failure.reason.seconds
-        )
-          this.floodUntil = Date.now() + failure.reason.seconds * 1000;
-        throw failure.reason;
+      const data=await source.read(start,block,combined);
+      if(data.length!==Math.min(block,item.size-start)) throw new Error("Incomplete range received from Telegram");
+      return data;
+    };
+    let next=offset;
+    const fill=()=>{while(pending.size<source.window && next<item.size) {const start=next;next+=block;pending.set(start,read(start).then(data=>({data}),error=>({error})));}};
+    try {
+      fill();
+      for(let current=offset;current<item.size;current+=block) {
+        const result=await pending.get(current);pending.delete(current);
+        if(result.error) {
+          if(/FLOOD/i.test(result.error.message || '') && result.error.seconds) this.floodUntil=Date.now()+result.error.seconds*1000;
+          throw result.error;
+        }
+        combined.throwIfAborted();
+        yield result.data;
+        fill();
       }
-      for (const result of results) {
-        if (signal.aborted) return;
-        yield result.value;
-      }
-    }
+    } finally { controller.abort();await Promise.allSettled(pending.values()); }
   }
+
   async disconnect() {
     this.connected = false;
     this.profile = null;

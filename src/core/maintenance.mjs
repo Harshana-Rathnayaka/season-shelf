@@ -31,9 +31,11 @@ export async function trashCompleted(queue, ids, trash) {
       if (await hashFile(job.finalPath) !== job.sha256) throw new Error("File changed since download; kept for manual review");
       await trash(job.finalPath);
       job.status = "deleted";
+      delete job.error;
       deleted++;
     } catch (error) {
-      job.error = String(error.message).slice(0,300);
+      if (error.code === "ENOENT") { job.status = "missing"; delete job.error; deleted++; continue; }
+      job.error = /EACCES|EPERM/.test(error.code || "") ? "Windows could not remove this file. Close apps using it and check permissions." : String(error.message).slice(0,300);
       failures.push({id, error:job.error});
     } finally { queue.namingLocks.delete(key); queue.save(); }
   }

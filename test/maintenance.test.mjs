@@ -42,3 +42,22 @@ test("orphan cleanup protects tracked and still-running partial files", async t 
   assert.equal(await fs.readFile(path.join(staging,tracked+".part"),"utf8"),"bytes");
   assert.equal(await fs.readFile(path.join(staging,running+".part"),"utf8"),"bytes");
 });
+
+test('deleting a missing saved file clears its entry without reporting a filesystem error', async t => {
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'shelf-missing-'));
+  t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const job={id:'1',status:'complete',finalPath:path.join(dir,'gone.mkv'),error:'ENOENT'};
+  let saved=0;
+  const queue={jobs:[job],namingLocks:new Set(),seasonKey:()=> 'season',save(){saved++;}};
+  const result=await trashCompleted(queue,['1'],()=>assert.fail('Missing files cannot be trashed'));
+  assert.equal(job.status,'missing');assert.equal(job.error,undefined);
+  assert.equal(result.failures.length,0);assert.equal(saved,1);assert.equal(queue.namingLocks.size,0);
+});
+
+test('workspace reset clears metadata atomically while retaining media and account preferences',async t=>{
+  const {clearWorkspace}=await import('../src/core/reset.mjs');const dir=await fs.mkdtemp(path.join(os.tmpdir(),'shelf-reset-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const file=path.join(dir,'saved.mkv');await fs.writeFile(file,'keep media');
+  const data={credentials:'encrypted',settings:{theme:'dark'},onboardingComplete:true,jobs:[{finalPath:file}]};const store={setMany(values){Object.assign(data,values);}};
+  const queue={jobs:data.jobs,running:new Map(),namingLocks:new Set(),emit(){}};const watcher={watches:[{}]};
+  clearWorkspace(queue,store,watcher);assert.deepEqual(data.jobs,[]);assert.equal(data.catalogue,null);assert.equal(data.usage.payloadBytes,0);assert.equal(data.credentials,'encrypted');assert.equal(data.onboardingComplete,true);assert.equal(await fs.readFile(file,'utf8'),'keep media');
+  queue.running.set('active',{});assert.throws(()=>clearWorkspace(queue,store,watcher),/Pause downloads/);
+});

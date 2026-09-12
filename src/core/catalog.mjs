@@ -3,15 +3,11 @@ export function parseEpisode(record) {
   const caption = String(record.caption || "");
   if (!/\.(mkv|mp4|avi|webm|m4v)$/i.test(filename)) return null;
   const text = `${filename} ${caption}`;
-  const tokens = [...text.matchAll(/\bS(\d{1,2})[ ._-]*E(\d{1,3})(?!\d)/gi)];
-  // Word boundaries do not recognise underscores as separators.
-  if (!tokens.length)
-    tokens.push(
-      ...text
-        .replaceAll("_", ".")
-        .matchAll(/\bS(\d{1,2})[ .-]*E(\d{1,3})(?!\d)/gi),
-    );
-  const identities = new Set(tokens.map((m) => `${+m[1]}:${+m[2]}`));
+  const tokens = [...text.replaceAll("_", ".").matchAll(/\bS(\d{1,2})[ .-]*E(\d{1,3})(?!\d)(?:[ .-]*E(\d{1,3})(?!\d)|-(\d{1,3})(?!\d))?/gi)];
+  const identities = new Set(tokens.map(m => `${+m[1]}:${+m[2]}`));
+  const ends = tokens.map(m=>+(m[3] || m[4] || m[2]));
+  const combined = tokens.some(m=>m[3] || m[4]);
+  const invalidCombined = tokens.some((m,index)=>ends[index] < +m[2] || ends[index] > +m[2]+1) || new Set(tokens.filter(m=>m[3] || m[4]).map(m=>+(m[3] || m[4]))).size > 1 || /E\d{1,3}[ ._-]*E\d{1,3}[ ._-]*E\d/i.test(text);
   const resolutions = [
     ...new Set(
       [...text.matchAll(/(?:^|[^\d])(480|720|1080|2160)p\b/gi)].map(
@@ -35,8 +31,8 @@ export function parseEpisode(record) {
   const reason =
     identities.size !== 1
       ? "Season or episode is missing or conflicting"
-      : /S\d{1,2}[ ._-]*E\d{1,3}[ ._-]*E\d|S\d{1,2}E\d{1,3}-\d{1,3}/i.test(text)
-        ? "Multiple episodes in one file"
+      : invalidCombined
+        ? "Episode range is ambiguous or not a consecutive pair"
         : resolutions.length !== 1
           ? "Resolution is missing or conflicting"
           : hevc === avc
@@ -50,7 +46,7 @@ export function parseEpisode(record) {
     filename;
   const title =
     titleText
-      .replace(/^.*?S\d{1,2}[ ._-]*E\d{1,3}/i, "")
+      .replace(/^.*?S\d{1,2}[ ._-]*E\d{1,3}(?:[ ._-]*E\d{1,3}|-\d{1,3})?/i, "")
       .replace(/[._]/g, " ")
       .replace(/(?:480|720|1080|2160)p.*$/i, "")
       .replace(/^[\s-]+|[\s-]+$/g, "") || `Episode ${episode ?? "?"}`;
@@ -60,6 +56,7 @@ export function parseEpisode(record) {
     caption,
     season,
     episode,
+    episodeEnd: combined ? Math.max(...ends) : episode,
     title,
     resolution: resolutions[0] ?? null,
     codec: hevc && !avc ? "HEVC" : avc && !hevc ? "H.264" : null,
@@ -89,17 +86,24 @@ export function selectEpisodes(records, mode = "archive", quality = {}) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(item);
   }
+  const covered = new Set();
   return [...groups.values()]
     .map((options) => {
       options.sort(
         (a, b) =>
+          ((b.episodeEnd || b.episode) - b.episode) - ((a.episodeEnd || a.episode) - a.episode) ||
           (a.codec === "HEVC" ? 0 : 1) - (b.codec === "HEVC" ? 0 : 1) ||
           a.size - b.size ||
           a.id.localeCompare(b.id),
       );
       return { ...options[0], alternatives: options.length - 1 };
     })
-    .sort((a, b) => a.season - b.season || a.episode - b.episode);
+    .sort((a, b) => a.season - b.season || a.episode - b.episode)
+    .filter(item=>{
+      const numbers = Array.from({length:(item.episodeEnd || item.episode)-item.episode+1},(_,i)=>`${item.season}:${item.episode+i}`);
+      if (numbers.some(key=>covered.has(key))) return false;
+      numbers.forEach(key=>covered.add(key)); return true;
+    });
 }
 
 export function availableQualities(records) {

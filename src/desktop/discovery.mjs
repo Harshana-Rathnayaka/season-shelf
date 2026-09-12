@@ -106,15 +106,20 @@ export class Discovery {
     signal.throwIfAborted();
     const message = messages.find(item=>item?.id === target.messageId && item.className !== "MessageEmpty");
     if (!message) throw new Error("The linked message was deleted or is not accessible to this account.");
-    return this.presentMessages([message]);
+    return this.presentMessages([message],peer);
   }
-  presentMessages(messages) {
+  presentMessages(messages, peer) {
     this.choices.clear();
+    const seen = new Set();
+    const gated = messages.some(message=>/\b(must join|join (?:the |our |these )?channels? (?:first|to)|subscribe|subscription required|verify membership)\b/i.test(message.message || ""));
     return {messages:messages.map(message=>({
       text:String(message.message || "").slice(0,4000),
-      links:discoveryLinks(message).map(link=>{
-        const id = randomUUID(); this.choices.set(id,link.target);
-        return {id,label:link.label,kind:link.target.kind};
+      links:discoveryLinks(message).flatMap(link=>{
+        const key = JSON.stringify(link.target) + (link.target.kind === "callback" ? message.id : link.target.kind === "unsupported" ? link.label : "");
+        if (seen.has(key)) return [];
+        seen.add(key);
+        const id = randomUUID(); this.choices.set(id,{...link.target,...(link.target.kind === "callback" ? {peer,messageId:message.id} : {})});
+        return [{id,label:link.label,kind:link.target.kind,automatic:link.automatic && !gated}];
       }),
     })),timedOut:messages.length === 0};
   }
@@ -138,12 +143,48 @@ export class Discovery {
       await this.wait(1500,undefined,{signal});
     }
     signal.throwIfAborted();
-    return this.presentMessages([...messages.values()].sort((a,b)=>a.id-b.id));
+    // Thread reads may omit or lag inline keyboard edits. Fetch the actual
+    // accepted messages again before presenting their current buttons.
+    if (messages.size) {
+      const hydrated = await client.getMessages(bot,{ids:[...messages.keys()]});
+      signal.throwIfAborted();
+      for (const message of hydrated) if (message && messages.has(message.id) && message.className !== "MessageEmpty") messages.set(message.id,message);
+    }
+    return this.presentMessages([...messages.values()].sort((a,b)=>a.id-b.id),bot);
   }
   async follow(id) {
     const target = this.choices.get(id);
     if (!target) throw new Error("Search result expired. Search again.");
     return this.run(async(client,signal)=>{
+      if (target.kind === "unsupported") throw new Error("This button needs Telegram. Its type is not supported yet.");
+      if (target.kind === "callback") {
+        if (!target.peer) throw new Error("This button has no message context. Search again.");
+        const current = await client.getMessages(target.peer,{ids:[target.messageId]});
+        signal.throwIfAborted();
+        const stillPresent = current.some(message=>message.id === target.messageId && discoveryLinks(message).some(link=>link.target.kind === "callback" && JSON.stringify(link.target.data) === JSON.stringify(target.data)));
+        if (!stillPresent) throw new Error("This bot button changed. Search again for current results.");
+        const answer = await client.invoke(new Api.messages.GetBotCallbackAnswer({peer:target.peer,msgId:target.messageId,data:Buffer.from(target.data)}));
+        signal.throwIfAborted();
+        if (answer.url) {
+          const next = parseDiscoveryLink(answer.url);
+          if (!next) throw new Error("The bot returned an unsupported link. Open this result in Telegram.");
+          return this.presentMessages([{id:target.messageId,message:answer.message || "",replyMarkup:{rows:[{buttons:[{text:"Continue to series",url:answer.url}]}]}}],target.peer);
+        }
+        let edited = current;
+        const before = JSON.stringify(current.map(message=>[message.message,discoveryLinks(message)]));
+        for (let attempt=0; attempt<6; attempt++) {
+          edited = await client.getMessages(target.peer,{ids:[target.messageId]});
+          signal.throwIfAborted();
+          if (answer.alert || JSON.stringify(edited.map(message=>[message.message,discoveryLinks(message)])) !== before) break;
+          if (attempt<5) await this.wait(1000,undefined,{signal});
+        }
+        const result = this.presentMessages(edited.filter(message=>message?.id === target.messageId),target.peer);
+        if (answer.message) result.notice = answer.message;
+        // Pagination and callbacks without a returned URL require selection;
+        // do not automatically press the same keyboard repeatedly.
+        result.messages.forEach(message=>message.links.forEach(link=>{ if (link.kind === "callback" || answer.alert) link.automatic=false; }));
+        return result;
+      }
       if (target.kind === "private-message") return this.readLinkedMessage(client,target,signal);
       if (target.kind === "bot-start") {
         const bot = await this.bot(client,target.username);
@@ -164,7 +205,7 @@ export class Discovery {
         if (entity.className === "User" && entity.bot && target.username.toLowerCase() === searchBot.toLowerCase()) {
           const startId = randomUUID();
           this.choices.set(startId,{kind:"bot-start",username:target.username,start:""});
-          return {messages:[{text:"This bot link has no series-specific start parameter.",links:[{id:startId,label:`Start @${target.username}`,kind:"bot-start"}]}]};
+          return {messages:[{text:"This bot link has no series-specific start parameter.",links:[{id:startId,label:`Start @${target.username}`,kind:"bot-start",automatic:true}]}]};
         }
         title = entity.title;
       }
@@ -187,6 +228,9 @@ export class Discovery {
         if (!entity || entity.left) {
           const updates = await client.invoke(new Api.messages.ImportChatInvite({hash:target.invite}));
           entity = updates.chats?.find(chat=>chat.className === "Channel" && chat.broadcast);
+          // A successful import can return updates without a full chat entity.
+          // Recheck this exact invite rather than guessing from recent dialogs.
+          if (!entity) entity = (await client.invoke(new Api.messages.CheckChatInvite({hash:target.invite}))).chat;
         }
       } else {
         entity = await client.getEntity(target.username);
@@ -196,6 +240,7 @@ export class Discovery {
       }
       signal.throwIfAborted();
       if (!entity) throw new Error("Join request submitted. Once approved, refresh your channels.");
+      if (entity.className !== "Channel" || !entity.broadcast) throw new Error("Channel membership is not ready yet. Refresh your channels after Telegram approves the join.");
       return channelRecord(entity);
     });
   }

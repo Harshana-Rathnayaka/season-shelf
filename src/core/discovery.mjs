@@ -3,7 +3,7 @@
 export function parseDiscoveryLink(input) {
   if (typeof input !== "string" || input.length > 2048) return null;
   let url;
-  try { url = new URL(input.trim()); } catch { return null; }
+  try { url = new URL(input.trim().replace(/^(?:www\.)?(t\.me|telegram\.me)\//i,"https://$1/")); } catch { return null; }
   if (url.username || url.password || url.port || url.hash) return null;
   const privatePath = /^(?:\/c\/)([1-9]\d{0,18})\/([1-9]\d{0,9})\/?$/.exec(url.pathname);
   const privateScheme = url.protocol === "tg:" && url.hostname === "privatepost" && !url.pathname;
@@ -46,8 +46,16 @@ export function discoveryLinks(message) {
   const text = String(message.message || "").slice(0, 65536);
   const candidates = [];
   for (const row of (message.replyMarkup?.rows || []).slice(0,100))
-    for (const button of (row.buttons || []).slice(0,100))
-      if (button.url) candidates.push({label:String(button.text || "Telegram link"),url:button.url});
+    for (const button of (row.buttons || []).slice(0,100)) {
+      // Layer 229 nests action fields inside KeyboardInlineButton.type.
+      // Retain legacy support for cached messages and older schemas.
+      const action = button.type || button;
+      const urlButton = !button.type || action.className === "InlineButtonTypeUrl";
+      if (urlButton && action.url) candidates.push({label:String(button.text || "Telegram link"),url:action.url,button:true});
+      else if (["KeyboardButtonCallback", "InlineButtonTypeCallback"].includes(action.className) && action.data?.length && action.data.length <= 64 && !action.requiresPassword)
+        candidates.push({label:String(button.text || "Bot result"),target:{kind:"callback",data:Array.from(action.data)}});
+      else candidates.push({label:String(button.text || "Telegram button"),target:{kind:"unsupported",buttonType:action.className || "Unknown"}});
+    }
   for (const entity of (message.entities || []).slice(0,200)) {
     if (entity.className === "MessageEntityTextUrl") candidates.push({label:text.slice(entity.offset,entity.offset + entity.length),url:entity.url});
     if (entity.className === "MessageEntityUrl") {
@@ -55,12 +63,16 @@ export function discoveryLinks(message) {
       candidates.push({label:url,url});
     }
   }
+  for (const match of text.matchAll(/(?:https:\/\/(?:t\.me|telegram\.me)\/|\bt\.me\/|tg:\/\/)[^\s<>]+/g))
+    candidates.push({label:match[0],url:match[0].replace(/[.,!;)]*$/,"")});
   const seen = new Set();
   return candidates.flatMap(candidate => {
-    const target = parseDiscoveryLink(candidate.url);
-    const key = JSON.stringify(target);
+    const target = candidate.target || parseDiscoveryLink(candidate.url) || (candidate.button ? {kind:"unsupported",buttonType:"Link format"} : null);
+    const key = JSON.stringify(target) + (target?.kind === "unsupported" ? candidate.label : "");
     if (!target || seen.has(key)) return [];
     seen.add(key);
-    return [{label:candidate.label.slice(0,200),target}];
+    const navigation = /^(?:[\s\p{P}\p{S}]*\d+\s*\/\s*\d+[\s\p{P}\p{S}]*|[\s\p{P}\p{S}]*)$/u.test(candidate.label) || /\b(next|previous|prev|back|page|subscribe|subscription|verify|request|join required)\b/i.test(candidate.label);
+    const ancillary = target.kind === "public-peer" && /(?:_chat$|^MovieClubFamily$)/i.test(target.username);
+    return [{label:candidate.label.slice(0,200),target,automatic:target.kind !== "unsupported" && !navigation && !ancillary}];
   });
 }

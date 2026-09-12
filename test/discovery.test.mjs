@@ -17,11 +17,13 @@ test("discovery ignores external, ambiguous and unrelated action links", () => {
 
 test("discovery collects multiple result buttons and caption links without executing callbacks", () => {
   const url="https://t.me/MCF_SeriesBot?start=one";
-  const message={message:"Download here",replyMarkup:{rows:[{buttons:[{text:"Series one",url},{text:"Page 2",data:Buffer.from("next")}]}]},entities:[{className:"MessageEntityTextUrl",offset:0,length:8,url},{className:"MessageEntityTextUrl",offset:9,length:4,url:"https://t.me/+Abcdef_123"}]};
+  const message={message:"Download here",replyMarkup:{rows:[{buttons:[{text:"Series one",url},{className:"KeyboardButtonCallback",text:"Page 2",data:Buffer.from("next")}]}]},entities:[{className:"MessageEntityTextUrl",offset:0,length:8,url},{className:"MessageEntityTextUrl",offset:9,length:4,url:"https://t.me/+Abcdef_123"}]};
   const links=discoveryLinks(message);
-  assert.equal(links.length,2);
+  assert.equal(links.length,3);
   assert.equal(links[0].label,"Series one");
-  assert.equal(links[1].target.kind,"invite");
+  assert.equal(links[1].target.kind,"callback");
+  assert.equal(links[1].automatic,false);
+  assert.equal(links[2].target.kind,"invite");
 });
 
 test("private message links preserve chat identity and message ID without inventing a start parameter", () => {

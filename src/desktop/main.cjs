@@ -158,7 +158,7 @@ app
         settings, channels, catalogue, jobs:queue.snapshot(), usage:queue.usage,
         currentBatchId:queue.currentBatchId, connected:adapter.connected, profile:adapter.profile,
         restoringSession:!!adapter.connecting, connectionError,
-        hasCredentials:!!store.get("credentials",null),version:app.getVersion(),
+        hasCredentials:!!store.get("credentials",null),version:app.getVersion(),customTitleBar:process.platform === "win32",
       };
     });
     handle("connect", async (payload) => {
@@ -187,6 +187,11 @@ app
       authPrompt = null;
     });
     handle("discovery-source", ({groupId}) => discovery.prepareSearch(groupId));
+    handle("window-theme", ({color,symbolColor}) => {
+      if (!/^#[0-9a-f]{6}$/i.test(color || "") || !/^#[0-9a-f]{6}$/i.test(symbolColor || "")) throw new Error("Invalid title bar colour");
+      if (process.platform === "win32") win.setTitleBarOverlay({color,symbolColor,height:32});
+      return {};
+    });
     handle("discovery-search", ({query,sourceId}) => discovery.search(query,sourceId));
     handle("discovery-open-message", ({link}) => discovery.openMessageLink(link));
     handle("discovery-follow", ({id}) => discovery.follow(id));
@@ -387,6 +392,7 @@ app
       minWidth: 1024,
       minHeight: 720,
       title: "Season Shelf",
+      ...(process.platform === "win32" ? {titleBarStyle:"hidden",titleBarOverlay:{color:"#101113",symbolColor:"#edf0ef",height:32}} : {}),
       backgroundColor: "#101113",
       autoHideMenuBar: true,
       webPreferences: {

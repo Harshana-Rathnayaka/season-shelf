@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
 const files = [
   "src/ui/icons.mjs",
+    "src/ui/discovery-flow.mjs",
     "src/core/appearance.mjs",
     "src/ui/appearance.mjs",
   "src/core/catalog.mjs",

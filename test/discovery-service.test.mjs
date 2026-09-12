@@ -13,6 +13,20 @@ const group={className:"Channel",megagroup:true,id:22,title:"MovieClubFamily Cha
 const groupClient=(extra={})=>({getEntity:async value=>value === "MCF_SeriesBot" ? bot : group,getInputEntity:async value=>value,...extra});
 const reply=(id,start)=>({id,senderId:1,message:`Series ${id}`,replyMarkup:{rows:[{buttons:[{text:`Result ${id}`,url:`https://t.me/MCF_SeriesBot?start=${start}`}]}]}});
 
+test('subscription completion joins only selected requirements then retries the original bot start',async()=>{
+  const joins=[];let starts=0;
+  const service=fixture({getEntity:async username=>username==='MCF_SeriesBot'?bot:{className:'Channel',broadcast:true,left:true,id:username},getInputEntity:async entity=>entity,getMessages:async()=>[],invoke:async request=>{
+    if(request.className==='channels.JoinChannel') joins.push(request.channel.id);
+    else {assert.equal(request.className,'messages.StartBot');assert.equal(request.startParam,'series_payload');starts++;}
+  }});
+  service.resumeTarget={kind:'bot-start',username:'MCF_SeriesBot',start:'series_payload'};
+  service.choices.set('a',{kind:'public-peer',username:'RequiredA',label:'Channel A'});
+  service.choices.set('b',{kind:'public-peer',username:'RequiredB',label:'Channel B'});
+  await assert.rejects(service.completeSubscriptions(['fake']),/expired/);
+  await service.completeSubscriptions(['a']);
+  assert.deepEqual(joins,['RequiredA']);assert.equal(starts,1);
+});
+
 test("successful invite import without chats resolves membership before returning scan identity",async()=>{
   let checks=0;
   const service=fixture({invoke:async request=>{
@@ -60,6 +74,7 @@ test("search posts to the shared group and collects only the bot's replies to th
   assert.equal(posts,0);
   const result=await service.search("Banshee",source.id);
   assert.equal(result.messages.length,2);
+  assert.equal(service.resumeTarget,null);assert.equal(service.resumeSearch.query,"Banshee");
   assert.equal(service.choices.get(result.messages[0].links[0].id).start,"edited");
   assert.equal(service.operation,null);
   assert.equal(posts,1);

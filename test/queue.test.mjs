@@ -55,6 +55,15 @@ async function settle(queue) {
     await delay(10);
   }
 }
+
+test('unverified files download exact bytes into a separate folder and retain the source name',async t=>{
+  const {queue,root,item,data}=await fixture(t);
+  await queue.add({items:[{...item,filename:'Unknown.video.mkv',season:null,episode:null,resolution:null,reason:'Missing metadata',unverified:true}],series:'Show',mode:'archive',root});
+  await settle(queue);
+  const job=queue.jobs[0];assert.equal(job.status,'complete');
+  assert.deepEqual(job.parts,['Unverified','Unknown.video.mkv']);
+  assert.deepEqual(await fs.readFile(job.finalPath),data);
+});
 test("downloads, checks and publishes correct bytes; duplicate enqueue is skipped", async (t) => {
   const f = await fixture(t);
   await f.queue.add({
@@ -318,4 +327,13 @@ test("naming journal recovers a verified target after restart without losing eit
     assert.ok((await fs.readFile(to)).equals(f.data));
     await assert.rejects(fs.access(from),{code:"ENOENT"});
   } finally { await recovered.stop(); }
+});
+
+test('completed season normalizes space-separated files on disk without changing bytes',async t=>{
+  const f=await fixture(t);f.queue.concurrency=0;
+  const items=[f.item,{...f.item,id:'2',episode:2,filename:'Show.S01E02.720p.x265.mkv'},{...f.item,id:'3',episode:3,filename:'Show S01E03 720p x265.mkv'}];
+  await f.queue.add({items,series:'Show',mode:'archive',root:f.root});
+  for(const job of f.queue.jobs) await f.queue.run(job,new AbortController().signal);
+  assert.equal(path.basename(f.queue.jobs[2].finalPath),'Show.S01E03.720p.x265.mkv');
+  assert.deepEqual(await fs.readFile(f.queue.jobs[2].finalPath),f.data);
 });

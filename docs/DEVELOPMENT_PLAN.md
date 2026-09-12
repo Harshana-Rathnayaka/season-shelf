@@ -2,6 +2,8 @@
 
 ## Current position
 
+Unverified downloads, missing-episode selection, subscription help, hourly watches, scheduling/rate limits, pooled resumable transfers, tray operation and installer/updater are implemented. See NEXT_SESSION.md for current boundaries.
+
 The shared-group correction supersedes the earlier private-query assumption.
 Read BOT_DISCOVERY_RESEARCH.md for the cited feasibility assessment and
 NEXT_SESSION.md for the full handoff.
@@ -26,12 +28,15 @@ NEXT_SESSION.md for the full handoff.
 
 ## Next development after acceptance
 
-- Live acceptance of implemented callback URL/edited-keyboard handling; collect separate callback reply messages and improve subscription-task UX.
+- Subscription joining/retry is implemented; expand provider-specific verification and capture separate callback reply messages.
 - Forum topics, late/edited reply updates and attachment-contained links.
 - Alternate 1080p bot and bot-delivered file cataloging.
-- Per-series destination/quality, optional language/media probing and monitoring.
-- Native storage failure testing, packaging and repository backup.
+- Hourly per-series watches and saved watch preferences are implemented; add broader per-series defaults and optional language/media probing.
+- NSIS packaging and GitHub updater are implemented; publish the initial release and configure signing.
 
 Do not infer full provider compatibility from mock tests. Retain original
 filenames, season-only folders, majority separator normalization after queued
 season completion, and display-only handling of completed legacy downloads.
+
+### 12 September follow-up completed
+Settings grouping, metadata-only reset plus independent usage reset, themed confirmations, secure login suggestions, development onboarding/replay, close-to-tray pause behaviour, automatic/deferred updates, separator spaces support, and README are implemented. Work in development mode; no new installer/release. See NEXT_SESSION for limits and validation.

@@ -11,7 +11,8 @@ async function fixture(t, bootstrap = null, handler = null) {
   );
   const { window } = dom;
   const calls = [];
-  if (bootstrap) window.shelf = { on() {}, async call(method,payload) {
+  let listener;
+  if (bootstrap) window.shelf = { on(fn) {listener=fn;}, async call(method,payload) {
     calls.push({method,payload});
     if (handler && method !== "bootstrap") return {ok:true,data:await handler(method,payload)};
     return {ok:true,data:method === "bootstrap" ? {...bootstrap,connected:true,demo:false} : []};
@@ -29,6 +30,7 @@ async function fixture(t, bootstrap = null, handler = null) {
     "src/core/appearance.mjs",
     "src/ui/appearance.mjs",
     "src/core/catalog.mjs",
+    "src/core/collection.mjs",
     "src/core/progress.mjs",
     "src/ui/demo.mjs",
     "src/ui/app.mjs",
@@ -47,7 +49,7 @@ async function fixture(t, bootstrap = null, handler = null) {
     assert.ok(element, `Control exists: ${selector}`);
     element.click();
   };
-  return { window, document: window.document, click, calls };
+  return { window, document: window.document, click, calls, emit:value=>listener(value) };
 }
 test("sample UI renders eight rows, switches quality and selects a whole season", async (t) => {
   const f = await fixture(t);
@@ -332,4 +334,55 @@ test("account button opens an anchored popup with logout without navigating",asy
   assert.equal(f.document.querySelector('#account-popover').hidden,true);
   f.click('[data-page="settings"]');
   assert.doesNotMatch(f.document.querySelector('main').textContent,/shade of dark|Anonymous \? @/);
+});
+
+test('unverified files are selectable in the library without entering the verified quality list',async t=>{
+  const item=parseEpisode({id:'42',filename:'Unknown.release.mkv',size:123,peer:{id:'1'}});
+  const f=await fixture(t,{settings:{theme:'dark',archiveRoot:{id:'root',path:'D:/Shows'}},channels:[],jobs:[],catalogue:{channel:{id:'1',title:'Show'},items:[item]}},async method=>method==='enqueue'?['job']:[]);
+  assert.equal(f.document.querySelector('.unverified-files'),null);
+  f.click('[data-action="library-tab"][data-tab="unverified"]');
+  assert.ok(f.document.querySelector('.unverified-files'));
+  assert.equal(f.document.querySelector('[data-action="review"]'),null);
+  f.click('.unverified-files input');
+  assert.equal(f.document.querySelector('[data-action="download"]').disabled,false);
+  f.click('[data-action="download"]');await new Promise(resolve=>setTimeout(resolve,0));
+  assert.deepEqual(Array.from(f.calls.find(call=>call.method==='enqueue').payload.unverifiedIds),['42']);
+});
+
+test('saved files hide deleted and missing history and show an empty state',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[{status:'deleted'},{status:'missing'}]});
+  f.click('[data-page="saved"]');
+  assert.equal(f.document.querySelectorAll('.queue-item').length,0);
+  assert.ok(f.document.querySelector('.empty-state'));
+});
+
+test('first-run guide persists dismissal and updates use readable status in About',async t=>{
+  const f=await fixture(t,{firstRun:true,version:'0.1.0',settings:{theme:'dark'},channels:[],jobs:[]},async method=>method==='update-status'?{state:'unpublished',message:'No published versions on GitHub'}:{});
+  assert.match(f.document.querySelector('#dialog').textContent,/Welcome to Season Shelf/);
+  f.click('[data-action="finish-onboarding"]');await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(f.document.querySelector('#dialog').open,false);
+  assert.ok(f.calls.some(c=>c.method==='finish-onboarding'));
+  f.click('[data-page="settings"]');await new Promise(resolve=>setTimeout(resolve,0));
+  assert.match(f.document.querySelector('#update-status').textContent,/first release/);
+  assert.doesNotMatch(f.document.querySelector('main').textContent,/No published versions|ENOENT/);
+  assert.equal(f.document.querySelector('.settings-group:last-child h2').textContent,'About');
+});
+
+test('themed confirmation close cancels and saved login fills all three fields',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async(method)=>method==='login-suggestions'?[{id:'saved',phone:'***6789',apiId:12}]:method==='login-suggestion'?{apiId:12,apiHash:'a'.repeat(32),phone:'+94123456789'}:{});
+  f.emit({type:'confirmation',data:{id:'token',title:'Delete file?',message:'Move file?',detail:'Media will go to Recycle Bin.',buttons:['Keep','Delete']}});
+  assert.ok(f.document.querySelector('[data-action="confirmation-reply"]'));
+  f.click('[data-action="close-dialog"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.find(c=>c.method==='confirmation-reply').payload.response,0);
+  f.click('.profile');f.click('[data-action="disconnect"]');await new Promise(r=>setTimeout(r,0));
+  f.click('.profile');f.click('#account-popover [data-action="connect"]');await new Promise(r=>setTimeout(r,0));
+  f.click('[data-action="use-login"]');await new Promise(r=>setTimeout(r,0));
+  const form=f.document.querySelector('#connect-form');assert.equal(form.elements.apiId.value,'12');assert.equal(form.elements.apiHash.value,'a'.repeat(32));assert.equal(form.elements.phone.value,'+94123456789');
+});
+
+test('missing history has no navigation badge and an empty batch hides its progress track',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[{status:'missing'}],channels:[]});
+  assert.equal(f.document.querySelector('.nav-count'),null);f.click('[data-page="queue"]');assert.equal(f.document.querySelector('.batch-progress').hidden,true);
+  f.click('[data-page="settings"]');assert.deepEqual(Array.from(f.document.querySelectorAll('.settings-group > h2'),e=>e.textContent),['Appearance','Downloads and storage','Channel filtering','Data and activity','About']);
+  assert.equal(f.document.querySelector('#account-popover [data-page="settings"]'),null);
 });

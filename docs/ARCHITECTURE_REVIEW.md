@@ -75,3 +75,7 @@ workflow and remaining integration limits are in BOT_DISCOVERY_RESEARCH.md.
 
 The common workspace now bounds all pages, preserving scroll on same-page
 updates. Colour picking disables Automatic and previews before Apply saves.
+
+## Automation and delivery modules
+
+TransferPolicy separates schedule/rate control from file publication. RangeSource isolates the pinned Teleproto internal media-scheduler bridge required for offset-resumable pooled downloads. Collection comparison is a pure module; watcher, tray and updater live in separate desktop modules. The UI still needs a larger page/component extraction. Release publishing is tag-triggered and no client contains publisher credentials.

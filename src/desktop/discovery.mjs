@@ -70,6 +70,8 @@ export class Discovery {
       const bot = await this.bot(client,searchBot);
       signal.throwIfAborted();
       this.choices.clear();
+      this.resumeTarget = null;
+      this.resumeSearch = {query:query.trim(),source};
       this.searchSource = null;
       const sent = await client.sendMessage(source.peer,{message:query.trim(),parseMode:false,linkPreview:false});
       return this.responses(client,source.peer,sent.id,signal,{botId:bot.id,threaded:group.className === "Channel"});
@@ -111,14 +113,14 @@ export class Discovery {
   presentMessages(messages, peer) {
     this.choices.clear();
     const seen = new Set();
-    const gated = messages.some(message=>/\b(must join|join (?:the |our |these )?channels? (?:first|to)|subscribe|subscription required|verify membership)\b/i.test(message.message || ""));
-    return {messages:messages.map(message=>({
+    const gated = messages.some(message=>/\b(must join|join (?:the |our |these )?channels? (?:first|to)|subscribe|subscription required|verify membership)\b/i.test(message.message || "") || discoveryLinks(message).some(link=>/\b(verify|joined|subscribe|subscription)\b/i.test(link.label)));
+    return {subscriptionRequired:gated,messages:messages.map(message=>({
       text:String(message.message || "").slice(0,4000),
       links:discoveryLinks(message).flatMap(link=>{
         const key = JSON.stringify(link.target) + (link.target.kind === "callback" ? message.id : link.target.kind === "unsupported" ? link.label : "");
         if (seen.has(key)) return [];
         seen.add(key);
-        const id = randomUUID(); this.choices.set(id,{...link.target,...(link.target.kind === "callback" ? {peer,messageId:message.id} : {})});
+        const id = randomUUID(); this.choices.set(id,{...link.target,label:link.label,...(link.target.kind === "callback" ? {peer,messageId:message.id} : {})});
         return [{id,label:link.label,kind:link.target.kind,automatic:link.automatic && !gated}];
       }),
     })),timedOut:messages.length === 0};
@@ -156,6 +158,7 @@ export class Discovery {
     const target = this.choices.get(id);
     if (!target) throw new Error("Search result expired. Search again.");
     return this.run(async(client,signal)=>{
+      if (["bot-start","callback"].includes(target.kind)) this.resumeTarget = {...target};
       if (target.kind === "unsupported") throw new Error("This button needs Telegram. Its type is not supported yet.");
       if (target.kind === "callback") {
         if (!target.peer) throw new Error("This button has no message context. Search again.");
@@ -214,27 +217,48 @@ export class Discovery {
       return {channel:{id,title:title || "Linked channel"}};
     });
   }
-  async join(id) {
+  subscriptionChoices() {
+    return [...this.choices].filter(([,target])=>['invite','public-peer'].includes(target.kind) && !/bot$/i.test(target.username || ''))
+      .map(([id,target])=>({id,label:target.label || target.username || 'Required channel'}));
+  }
+  async completeSubscriptions(ids) {
+    if (!Array.isArray(ids) || !ids.length || ids.length>10 || new Set(ids).size!==ids.length) throw new Error('Select between one and ten required channels');
+    const allowed = new Set(this.subscriptionChoices().map(choice=>choice.id));
+    if(ids.some(id=>!allowed.has(id))) throw new Error('Subscription choices expired. Open the bot result again.');
+    const resume = this.resumeTarget;
+    const search = this.resumeSearch;
+    if(!resume && !search) throw new Error('Open the series bot first so its request can be retried after joining.');
+    for(const id of ids) await this.join(id,true);
+    if(!resume) {
+      const id=randomUUID();
+      this.searchSource={...search.source,id,expires:this.now()+300000};
+      return this.search(search.query,id);
+    }
+    const id=randomUUID();this.choices.set(id,resume);
+    return this.follow(id);
+  }
+  async join(id, subscription = false) {
     const target = this.choices.get(id);
     if (!target || !["invite","public-peer"].includes(target.kind)) throw new Error("Channel choice expired");
     return this.run(async(client,signal)=>{
       let entity;
+      const valid=entity=>entity && (subscription ? ["Channel","Chat"].includes(entity.className) : entity.className === "Channel" && entity.broadcast);
       if (target.kind === "invite") {
         const preview = await client.invoke(new Api.messages.CheckChatInvite({hash:target.invite}));
         entity = preview.chat;
-        if (!entity && (!preview.channel || preview.megagroup)) throw new Error("This is not a broadcast channel invite");
-        if (entity && (entity.className !== "Channel" || !entity.broadcast)) throw new Error("This is not a broadcast channel");
+        if (!entity && !subscription && (!preview.channel || preview.megagroup)) throw new Error("This is not a broadcast channel invite");
+        if (entity && !valid(entity)) throw new Error("This is not a broadcast channel");
         signal.throwIfAborted();
         if (!entity || entity.left) {
           const updates = await client.invoke(new Api.messages.ImportChatInvite({hash:target.invite}));
-          entity = updates.chats?.find(chat=>chat.className === "Channel" && chat.broadcast);
+          entity = updates.chats?.find(chat=>valid(chat));
           // A successful import can return updates without a full chat entity.
           // Recheck this exact invite rather than guessing from recent dialogs.
           if (!entity) entity = (await client.invoke(new Api.messages.CheckChatInvite({hash:target.invite}))).chat;
         }
       } else {
         entity = await client.getEntity(target.username);
-        if (entity.className !== "Channel" || !entity.broadcast) throw new Error("This is not a broadcast channel");
+        if (!valid(entity)) throw new Error("This is not a broadcast channel");
         signal.throwIfAborted();
         if (entity.left) await client.invoke(new Api.channels.JoinChannel({channel:await client.getInputEntity(entity)}));
       }

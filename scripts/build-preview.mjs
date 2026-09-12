@@ -7,6 +7,7 @@ const files = [
     "src/core/appearance.mjs",
     "src/ui/appearance.mjs",
   "src/core/catalog.mjs",
+    "src/core/collection.mjs",
     "src/core/progress.mjs",
   "src/ui/demo.mjs",
   "src/ui/app.mjs",

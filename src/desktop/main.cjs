@@ -7,12 +7,15 @@ const {
   shell,
   Menu,
   powerSaveBlocker,
+  Notification,
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const { pathToFileURL } = require("node:url");
 const { randomUUID } = require("node:crypto");
-let win,
+let watcher,
+  tray,
+  win,
   store,
   queue,
   adapter,
@@ -22,6 +25,8 @@ let win,
   quitting = false;
 const uiFile = path.join(__dirname, "../ui/index.html");
 const uiUrl = pathToFileURL(uiFile).href;
+// Keep development data intact; installed builds use a separate, stable profile across updates.
+require("./profile.cjs").configureProfile(app);
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on("second-instance", () => {
   win?.show();
@@ -46,8 +51,10 @@ app
     ]);
     const {pendingEntries, removePending, trashCompleted, orphanedPartials, trashOrphans} = await import("../core/maintenance.mjs");
     const {cleanAppearance} = await import("../core/appearance.mjs");
+    await fs.mkdir(app.getPath("userData"), {recursive:true});
     store = new Store(path.join(app.getPath("userData"), "shelf.sqlite"));
     const notify = (type, data) => {
+      if(type==="updates" && data.state==="ready" && !data.deferred && Notification.isSupported()){const notice=new Notification({title:"Season Shelf update ready",body:"Open the app to restart now or install on the next launch."});notice.on("click",()=>{win?.show();win?.focus();});notice.show();}
       if (win && !win.isDestroyed())
         win.webContents.send("shelf:event", { type, data });
     };
@@ -107,6 +114,9 @@ app
       watchRoot: null,
     });
     settings.hiddenKeywords ??= defaultHiddenKeywords;
+    const {TransferPolicy,cleanTransfer}=await import("../core/transfer-policy.mjs");
+    const {unverifiedItems,missingEpisodes}=await import("../core/collection.mjs");
+    adapter.transferPolicy=new TransferPolicy(settings.transfer);
     queue = new DownloadQueue({
       store,
       adapter,
@@ -126,6 +136,8 @@ app
         sleepBlocker = undefined;
       }
     });
+    const {SeriesWatcher}=await import("./watch-series.mjs");
+    watcher=new SeriesWatcher({store,adapter,queue,notify:info=>{notify("new-episodes",info);if(Notification.isSupported())new Notification({title:`New episodes: ${info.title}`,body:`${info.count} matching files ${info.automatic ? "queued" : "available. Open Library and rescan to download."}`}).show();}});
     let channels = store.get("channels", []),
       catalogue = store.get("catalogue", null),
       scanning = false;
@@ -147,7 +159,29 @@ app
         }
       });
     }
+    const confirmInApp=require("./confirmations.cjs").createConfirmations({handle,notify});
+    const rememberedLogin=require("./login-memory.cjs").loginMemory(store,safeStorage);
+    handle("login-suggestions",()=>rememberedLogin.list());
+    handle("login-suggestion",({id})=>rememberedLogin.get(id));
+    handle("forget-login-suggestions",()=>{rememberedLogin.forget();return {};});
+    handle("licenses",async()=>JSON.parse(await fs.readFile(path.join(__dirname,"assets/licenses.json"),"utf8")));
     let sessionRestore, connectionError = "";
+    const {clearWorkspace,freshUsage}=await import("../core/reset.mjs");
+    handle("clear-app-data",async()=>{
+      const busy=()=>scanning || discovery.operation || authPrompt || adapter.connecting || watcher.checking || queue.running.size || queue.namingLocks.size;
+      if(busy()) throw new Error("Pause downloads and finish current operations before clearing app data.");
+      const answer=await confirmInApp({type:"warning",title:"Clear app data?",message:"Clear download history and the current library?",detail:"Also clears saved-file history, series watches and lifetime totals. Downloaded media and partial files stay on disk. Your Telegram login, preferences and completed guide are kept. Cleared file history cannot be restored from the app.",buttons:["Keep data","Clear app data"],defaultId:0,cancelId:0});
+      if(answer.response!==1) return {cleared:false};
+      if(busy()) throw new Error("An operation started. Wait for it to finish and try again.");
+      const data=clearWorkspace(queue,store,watcher);channels=[];catalogue=null;discovery.choices.clear();
+      return {cleared:true,...data};
+    });
+    handle("reset-activity",async()=>{
+      const answer=await confirmInApp({type:"question",title:"Reset lifetime activity?",message:"Start lifetime counters from zero?",detail:"Download history, queue progress and files are kept.",buttons:["Keep totals","Reset totals"],defaultId:0,cancelId:0});
+      if(answer.response===1){queue.usage=freshUsage();queue.save();}
+      return queue.usage;
+    });
+    handle("finish-onboarding", () => { store.set("onboardingComplete", true); return {}; });
     handle("bootstrap", () => {
       if (!adapter.connected && !adapter.connecting && store.get("credentials", null) && !sessionRestore) {
         sessionRestore = adapter.connect(null, {interactive:false})
@@ -155,6 +189,7 @@ app
           .finally(() => notify("connection", {connected:adapter.connected,restoringSession:false,connectionError,profile:adapter.profile}));
       }
       return {
+        firstRun: !store.get("onboardingComplete", false),
         settings, channels, catalogue, jobs:queue.snapshot(), usage:queue.usage,
         currentBatchId:queue.currentBatchId, connected:adapter.connected, profile:adapter.profile,
         restoringSession:!!adapter.connecting, connectionError,
@@ -176,6 +211,7 @@ app
             }
           : null,
       );
+      rememberedLogin.save({apiId:Number(payload.apiId),apiHash:String(payload.apiHash || ""),phone:String(payload.phone || "")});
       connectionError = "";
       return result;
     });
@@ -195,6 +231,18 @@ app
     handle("discovery-search", ({query,sourceId}) => discovery.search(query,sourceId));
     handle("discovery-open-message", ({link}) => discovery.openMessageLink(link));
     handle("discovery-follow", ({id}) => discovery.follow(id));
+    handle("watch-list",()=>watcher.watches);
+    handle("watch-set",payload=>watcher.set(catalogue,payload,settings[`${payload.mode}Root`]));
+    handle("watch-check",async()=>{await watcher.check();return watcher.watches;});
+    handle("subscription-choices",()=>discovery.subscriptionChoices());
+    handle("complete-subscriptions",({ids})=>discovery.completeSubscriptions(ids));
+    handle("find-missing",async ({mode})=>{
+      if(!catalogue || !["archive","watch"].includes(mode)) throw new Error("Choose a series first");
+      for(const job of queue.jobs.filter(job=>job.status==="complete" && String(job.item.peer?.id)===String(catalogue.channel.id) && job.mode===mode)) {
+        try {await fs.access(job.finalPath);} catch(error) {if(error.code==="ENOENT") job.status="missing";else throw error;}
+      }
+      queue.save();return queue.snapshot();
+    });
     handle("discovery-cancel", () => { discovery.cancel(); return {}; });
     handle("discovery-join", async ({id}) => {
       const channel = await discovery.join(id);
@@ -226,8 +274,8 @@ app
       const result = await dialog.showOpenDialog(win, {
         title:
           mode === "archive"
-            ? "Choose your archive folder on the HDD"
-            : "Choose your temporary viewing folder",
+            ? "Choose your download folder"
+            : "Choose your watch folder",
         properties: ["openDirectory", "createDirectory"],
       });
       if (!result.canceled) {
@@ -249,6 +297,8 @@ app
       return settings;
     });
     handle("settings", (payload) => {
+      if (payload.transfer !== undefined) {settings.transfer=cleanTransfer(payload.transfer);adapter.transferPolicy.configure(settings.transfer);}
+      if(typeof payload.closeToTray === "boolean") settings.closeToTray=payload.closeToTray;
       if (payload.appearance !== undefined) settings.appearance = cleanAppearance(payload.appearance);
       if (payload.hiddenKeywords !== undefined) settings.hiddenKeywords = cleanKeywords(payload.hiddenKeywords);
       if (typeof payload.sidebarCollapsed === "boolean")
@@ -260,7 +310,7 @@ app
       store.set("settings", settings);
       return settings;
     });
-    handle("enqueue", async ({ ids, mode, quality }) => {
+    handle("enqueue", async ({ ids, mode, quality, unverifiedIds = [] }) => {
       if (
         !catalogue ||
         !["archive", "watch"].includes(mode) ||
@@ -271,9 +321,11 @@ app
       const root = settings[`${mode}Root`];
       if (!root) throw new Error("Choose a destination folder first");
       const selected = new Set(ids);
+      if(!Array.isArray(unverifiedIds)) throw new Error("Invalid unverified selection");
       const items = selectEpisodes(catalogue.items, mode, quality).filter((item) =>
         selected.has(item.id),
       );
+      items.push(...unverifiedItems(catalogue.items).filter(item=>unverifiedIds.includes(item.id)));
       if (!items.length) throw new Error("No matching episodes selected");
       return queue.add({ items, series: catalogue.channel.title, mode, root });
     });
@@ -306,7 +358,7 @@ app
         throw new Error("Only completed downloads can be deleted here");
       if (queue.namingLocks.has(queue.seasonKey(job)) || job.renamePending)
         throw new Error("Season filenames are being finalized; try again shortly");
-      const result = await dialog.showMessageBox(win, {
+      const result = await confirmInApp({
         type: "question",
         title: "Delete downloaded file?",
         message: `Move ${path.basename(job.finalPath)} to the Recycle Bin?`,
@@ -316,21 +368,14 @@ app
         cancelId: 0,
       });
       if (result.response !== 1) return queue.snapshot();
-      if ((await hashFile(job.finalPath)) !== job.sha256)
-        throw new Error(
-          "The file has changed since download; manage it in File Explorer",
-        );
-      if (queue.namingLocks.has(queue.seasonKey(job)) || job.renamePending)
-        throw new Error("Season filenames are being finalized; try again shortly");
-      await shell.trashItem(job.finalPath);
-      job.status = "deleted";
-      queue.save();
+      const outcome = await trashCompleted(queue, [id], file => shell.trashItem(file));
+      if (outcome.failures.length) throw new Error(outcome.failures[0].error);
       return queue.snapshot();
     });
     handle("delete-all-queue", async () => {
       const ids = pendingEntries(queue).map(job => job.id);
       if (!ids.length) return {jobs:queue.snapshot(),removed:0};
-      const result = await dialog.showMessageBox(win, {
+      const result = await confirmInApp({
         type:"question", title:"Delete all pending queue entries?",
         message:`Remove ${ids.length} unfinished queue entries?`,
         detail:"Downloads will stop. Completed files and retained partial files stay on disk. Files already checking or transferring are kept until they finish.",
@@ -352,7 +397,7 @@ app
     handle("delete-all-saved", async () => {
       const jobs = queue.jobs.filter(job => job.status === "complete");
       if (!jobs.length) return {jobs:queue.snapshot(),deleted:0,failures:[]};
-      const result = await dialog.showMessageBox(win, {
+      const result = await confirmInApp({
         type:"warning",title:"Delete all saved files?",
         message:`Move ${jobs.length} saved files to the Recycle Bin?`,
         detail:"Includes BOTH Archive and Watch copies. Changed files and files being renamed will be kept.\n\n" + jobs.slice(0,8).map(job => path.basename(job.finalPath)).join("\n") + (jobs.length > 8 ? "\n...and more" : ""),
@@ -368,7 +413,7 @@ app
     handle("cleanup-staging", async () => {
       const files = await orphanedPartials(queue);
       if (!files.length) return {deleted:0,failures:[]};
-      const result = await dialog.showMessageBox(win, {
+      const result = await confirmInApp({
         type:"question",title:"Clean up unused partial files?",
         message:`Move ${files.length} unused partial files to the Recycle Bin?`,
         detail:"These partial files have no queue entry. Paused, cancelled, failed and active jobs with queue entries are preserved.",
@@ -392,6 +437,7 @@ app
       minWidth: 1024,
       minHeight: 720,
       title: "Season Shelf",
+      icon:path.join(__dirname,"assets/icon.ico"),
       ...(process.platform === "win32" ? {titleBarStyle:"hidden",titleBarOverlay:{color:"#101113",symbolColor:"#edf0ef",height:32}} : {}),
       backgroundColor: "#101113",
       autoHideMenuBar: true,
@@ -407,6 +453,9 @@ app
     win.webContents.session.setPermissionRequestHandler(
       (_webContents, _permission, callback) => callback(false),
     );
+    app.setAppUserModelId("local.seasonshelf.desktop");
+    tray=require("./tray.cjs").installTray({win,queue,settings:()=>settings,isQuitting:()=>quitting});
+    require("./updates.cjs").installUpdates({app,handle,notify,settings:()=>settings,saveSettings:()=>store.set("settings",settings),busy:()=>watcher.checking || queue.running.size || queue.namingLocks.size || scanning || !!discovery.operation || !!authPrompt || adapter.connecting,beforeInstall:async()=>{watcher.stop();await queue.stop();await adapter.disconnect();quitting=true;}});
     await win.loadFile(uiFile);
     if (!app.isPackaged && process.argv.includes("--dev")) {
       const { enableDevelopment } = require("./development.cjs");
@@ -424,6 +473,7 @@ app.on("before-quit", (event) => {
   quitting = true;
   authPrompt?.reject(new Error("App closing"));
   discovery?.cancel();
+  watcher?.stop();
   Promise.resolve(queue?.stop())
     .then(() => adapter?.disconnect())
     .finally(() => app.exit(0));

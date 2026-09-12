@@ -8,3 +8,7 @@ artifacts/
 *.log
 credentials*
 .DS_Store
+
+.npm-cache/
+
+.build-cache/

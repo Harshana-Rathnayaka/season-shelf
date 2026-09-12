@@ -1,97 +1,99 @@
-# Season Shelf
+﻿<div align="center">
+  <img src="src/desktop/assets/icon.png" width="88" alt="Season Shelf icon">
+  <h1>Season Shelf</h1>
+  <p><strong>Your series. Your folders. A little less clicking.</strong></p>
+  <p>A Windows desktop companion for organising and downloading episode files from Telegram.</p>
+  <p><a href="#get-started">Get started</a> · <a href="docs/DEVELOPMENT.md">Development</a> · <a href="docs/NEXT_SESSION.md">Roadmap</a></p>
+  <p><strong>In development</strong> · Electron · JavaScript · SQLite · Teleproto</p>
+</div>
 
-A local desktop companion for episodic Telegram downloads. Built with **Electron + JavaScript**, a **Node.js download engine**, **Teleproto**, and a local **SQLite** database.
+![Season Shelf series library, using illustrative sample data](docs/assets/library-preview.png)
 
-**Status: working development build; user reports Telegram works.** 46 offline tests pass. The latest UI/queue changes need live and visual acceptance. See [current changes and tomorrow's backlog](docs/NEXT_SESSION.md). No Telegram credentials or media are included.
+## From channel to collection
 
-## Try the interface first
+Choose a series channel, pick a quality, and select your episodes. Season Shelf handles the queue, checks the downloaded bytes and saves them into season folders.
 
-Open **docs/preview.html** in your browser. No installation or account is required. Explore dark/light mode, seasons, episode selection, quality presets and the sample queue. This is a sample-only preview: it cannot download, sign in or access your files.
+| Feature | What it does |
+| --- | --- |
+| Channel discovery | Browse joined channels or follow supported MovieClubFamily bot results and subscription steps. |
+| Quality selection | Shows formats found in the channel. Archive defaults to 720p HEVC; Watch prefers 1080p. |
+| Verified / Unverified | Keep recognised episode metadata separate from files you choose manually. |
+| Resumable downloads | Pause, resume, cancel or remove individual files or the queue. |
+| Season filenames | Keep original names; after queued season files finish, match minority separators to the season's majority style. Supports dots, underscores, dashes and spaces. |
+| Collection tools | Find missing episodes in app-managed history, review saved files and move selected media to the Recycle Bin. |
+| Series watches | Check new uploads hourly while running. Notify or queue automatically when enabled. |
+| Transfer controls | Set download hours, a shared speed limit and simultaneous downloads. |
+| Personal workspace | Customise theme, colours, font size and weight. Collapse the sidebar and keep controls visible while lists scroll. |
 
-## Run the desktop app on Windows
+## Get started
 
-For your requested folder, use `C:\Users\DELL\Desktop\Hash\Projects\season-shelf`. See **docs/WINDOWS_QUICK_START.md**. The ZIP includes the `season-shelf` folder. **Setup.cmd** installs and tests dependencies; **Start.cmd** launches the app; **Preview.cmd** opens the sample interface without installation.
+**Development builds only for now.** No production release is being published yet.
 
-1. Install **Node.js 24 LTS** from https://nodejs.org/ if it is not installed.
-2. Extract this project to a normal folder, for example `C:\Projects\season-shelf`. Do not run it from inside the ZIP.
-3. Open Terminal in that folder and run:
-
-   ```powershell
-   npm ci
-   npm test
-   npm start
-   ```
-
-4. Click **Connect Telegram**. Get your own API ID and API hash at https://my.telegram.org/apps. Enter them **in the desktop app**, along with your phone number. Enter any login code or two-step verification password in the app when asked. Do not send these values in chat or commit them to Git.
-5. In **Settings**, choose an Archive folder on your HDD and a separate Watch folder on your PC.
-6. Open/join your series channel in Telegram normally. In Season Shelf, select **Change series**, refresh the channel list, select the channel, and wait for its metadata scan.
-7. Choose **Build your archive** (720p HEVC) or **Just here to watch** (1080p), select episodes or seasons, and click **Download selected**.
-
-Your Telegram Desktop app does not need to remain open. Season Shelf must remain running, and the PC needs power and an internet connection. It prevents idle system sleep during active work, but cannot continue during shutdown or a forced sleep.
-
-If Electron's runtime download was interrupted during installation, rerun `npm ci`. Downloads and user state live outside the source folder.
-
-## Current behaviour
-
-- Archive defaults to 720p HEVC/x265; Watch defaults to 1080p and prefers HEVC. Resolution and codec selectors override these defaults; the smallest matching candidate is chosen per episode.
-- Choose the show folder itself. New jobs create only Season NN subfolders and preserve source filenames, normalizing dots/underscores/dashes only after all queued files in the season finish. Existing queued jobs retain their saved paths.
-- The library has compact channel-derived quality buttons, scrollable seasons, normal page scrolling with sticky essential controls, whole-row selection and a collapsible sidebar. Suggested channels filters likely finance/crypto names; All channels restores them.
-- Saved files show a compact actual filename with full details and Show in folder. Existing files are not renamed.
-- Downloads shows downloaded/total/remaining size, individual removal, and Pause all / Resume all / Cancel all. Removed entries leave partial files on disk; re-enqueue starts fresh. The How it works page explains these controls.
-- Season and episode numbers come from attachment filenames/captions. Conflicting, unknown, and multi-episode labels appear in a review list and are excluded.
-- “Seasons found” and “matching episodes” describe channel results, not externally verified series completeness. Scan limit: 10,000 messages; a warning appears at the limit. Channel picker: up to 300 recent groups/channels.
-- Downloads use 512 KiB ranges, four bounded parallel ranges per file, and 1–4 configurable active files (default 2). At most about 2 MiB of range data per file is buffered by the adapter, plus protocol overhead.
-- A SQLite queue preserves jobs. Restart leaves unfinished jobs paused. The saved encrypted session reconnects automatically; resume paused jobs when ready. An expired or revoked session requires explicit sign-in. Resuming truncates only an incomplete 512 KiB tail, then continues from the stored file length.
-- Downloads stage under Electron's user-data directory (usually `%APPDATA%\season-shelf\staging` when running from source). Both modes stage locally, so leave sufficient PC space. Completed files are copied to the selected mode's destination and SHA-256 checked before the staging file is deleted.
-- Destination folders get a small `.season-shelf-root.json` marker to recognise them. Do not remove it while jobs refer to the folder. Drive disappearance produces a waiting status; reconnect it with the same drive letter and resume. Automatic drive-letter remapping is a later enhancement.
-- Different existing destination files are never overwritten. A matching verified destination is accepted after an interrupted transfer.
-- Cancel preserves partial downloads for possible resume; automatic partial-file cleanup is not implemented. Completed Archive and Watch files can be moved to the Recycle Bin after confirmation using their queue action.
-- A transfer already checking/publishing is allowed to finish; pause/cancel applies to queued/network downloads. Closing the app preserves staged files for recovery.
-- SHA-256 here verifies copies and local identity. It is not proof of source authenticity or visual quality. There is no video transcoding, metadata probing, player integration beyond opening the default player, or automatic watched detection.
-- No servers, cloud database, AI API, telemetry, embedded remote content or video conversion. Telegram account and network limitations apply.
-
-## Important development limitations
-
-- **Telegram login and actual downloads have not been tested with a live account in this environment.** Additional account challenges such as CAPTCHA may require using the official client; this build does not automate challenges.
-- **Speed parity with Telegram Desktop is not established.** Use the benchmark worksheet in the development plan before relying on a large batch. The iterator requests regular Telegram file delivery; if a source requires an unsupported CDN redirect, the job fails clearly and retains its partial file. TDLib is the planned alternative if performance or transport coverage requires it.
-- The Windows executable, OS encryption, HDD unplug behaviour and player/Recycle Bin actions need a Windows acceptance test. The source is provided; no prebuilt executable is claimed.
-- The interface has dark/light/system themes and responsive rules, but visual review remains pending because the build environment blocked local browser preview.
-- Telegram bot search/navigation is a later stage. Version 0.1 starts at the series channel you can already access.
-- On filesystems without hard links (e.g. exFAT), exclusive-copy publishing is used. A crash during that final fallback copy may leave an incomplete destination; the staged original is retained, and the next attempt refuses to overwrite a mismatching destination. Remove only the incomplete destination after checking it, then resume.
-- Audio/subtitle language and preferred release-group filters are not implemented yet. Check filename details or sample an episode when those matter.
-
-## Development
+On Windows, with Node.js 24 or later installed:
 
 ```powershell
-npm test                 # Offline parser, adapter, queue and file-safety tests
-npm run check            # JavaScript syntax checks
-npm run preview          # Local sample UI at the printed /ui/index.html URL
-node scripts/build-preview.mjs  # Rebuild the standalone HTML preview
-npm run pack:win         # On Windows: build a portable executable locally
+npm.cmd ci
+npm.cmd run dev
 ```
 
-See **docs/DEVELOPMENT_PLAN.md** for stages, acceptance gates and the speed benchmark worksheet. **docs/VALIDATION.md** records what was checked. Native packaging downloads build dependencies once; no hosted service is required to run the app.
+Development mode reloads UI changes and restarts backend changes when current work is idle. You do not need to rebuild an installer for each edit. `Start.cmd` launches normally; `Dev.cmd` starts development mode.
 
-## GitHub
+1. Follow the welcome guide and connect your Telegram account using your own API ID, API hash and phone number.
+2. Choose a series channel, or use the supported bot discovery flow.
+3. Choose the show's **Download folder**, such as `D:\Shows\12 Monkeys`. Episodes go into `Season 01` inside it. The optional **Watch folder** is separate.
+4. Select files and download. Track the current batch in Downloads.
 
-The connected GitHub account was available, but its connector did not expose repository creation. No remote repo has been created. Create an empty **private** repository named `season-shelf` and run these commands from this extracted folder:
+Replay onboarding any time from **Settings → About → Watch guide again**. Its completion is remembered in both development and installed profiles.
+
+Want to explore without connecting Telegram? Open [the sample preview](docs/preview.html) locally. It uses sample data and does not download or access your account.
+
+## Your data stays on your computer
+
+- Telegram sessions and remembered sign-in details are encrypted using operating-system storage. Passwords and verification codes are not saved.
+- After logout, a remembered-account suggestion can fill all three connection fields. Use **Forget suggestions** to remove it.
+- Development and installed apps have separate profiles. Installed updates preserve their profile.
+- **Clear app data** removes queue/history, saved-file records, the selected series, series watches and lifetime totals. Media and partial files stay on disk; account, preferences and onboarding completion remain.
+- **Reset lifetime totals** clears only activity counters. It does not change queue progress or history.
+- Deleting media is a separate, confirmed action in **Saved files**. After clearing history, manage previously downloaded files in File Explorer.
+
+Closing the window pauses downloads, including when **Keep in system tray** is selected. File verification and transfer operations finish safely. Resume from the tray or Downloads.
+
+## File handling
+
+Files are staged locally, checked, and published without replacing a different existing file. Interrupted work returns paused after a restart.
+
+Filename normalization uses completed, app-managed files from the same season and destination. It preserves extensions and recognised tags such as `WEB-DL`. Tied styles remain unchanged. Failed or paused season entries delay normalization; filename collisions retain the original and offer a retry in File details. Unverified files keep original names in an `Unverified` folder.
+
+## Updates, when releases begin
+
+The updater targets this repository's GitHub Releases. Installed builds check at startup and daily, download available updates, then offer **Restart now** or **Not now**. Deferred updates install on the next launch after release and download verification; that check requires connectivity. Active work must finish before installation.
+
+Development mode does not install updates. Packaging is intentionally separate from everyday development. See [release and signing instructions](docs/RELEASES.md).
+
+## Development checks
 
 ```powershell
-git init -b main
-git add .
-git commit -m "Build initial Season Shelf desktop app"
-git remote add origin https://github.com/Harshana-Rathnayaka/season-shelf.git
-git push -u origin main
+npm.cmd run check
+npm.cmd test
+node scripts/build-preview.mjs
 ```
 
-If the folder is already a Git checkout, skip `git init` and the initial commit if present. `.gitignore` excludes dependencies, builds, databases and credential files. All actual account state is stored separately in Electron's user-data directory.
+The tests cover download integrity and recovery, discovery, parsing, naming, settings, update decisions and UI interactions. Isolated Electron screenshots are used for layout checks; they do not validate live Telegram transfers.
 
-## Dependency note
+| Area | Location |
+| --- | --- |
+| Queue, parsing, file integrity and persistence | `src/core/` |
+| Electron, Telegram, secure storage and IPC | `src/desktop/` |
+| Interface, appearance and interaction | `src/ui/` |
+| Regression tests | `test/` |
+| Development notes and research | `docs/` |
 
-The original plan named GramJS. During installation, npm marked `telegram@2.26.22` archived and directed developers to Teleproto. This build pins **teleproto 1.229.0**, uses its current two-argument `iterDownload` API, and tests that adapter contract with mocked file ranges. See https://docs.teleproto.dev/migrating-from-gramjs and https://core.telegram.org/api/obtaining_api_id.
+## Current boundaries
 
-## Live development
+Bot discovery is specific to supported Telegram flows. Some attachment links, callbacks that send separate messages, and approval-only subscriptions still need Telegram. Alternate-bot 1080p retrieval and WhatsApp completion messages are not implemented. Missing-episode checks compare app-managed history, not arbitrary files elsewhere on disk. Watches need the app running; downloads cannot continue while the PC sleeps or is shut down.
 
-Run **Dev.cmd** or `npm.cmd run dev` for UI auto-reload, deferred backend restart and Chromium DevTools. Close the normally launched instance first. See [development workflow](docs/DEVELOPMENT.md). Settings now includes editable channel keywords and lifetime activity; Downloads tracks the current batch separately.
+See [the current handoff](docs/NEXT_SESSION.md) for remaining work and [the architecture review](docs/ARCHITECTURE_REVIEW.md) for design decisions.
 
-Bulk actions are now available: Delete all pending removes unfinished queue entries without deleting saved media or partial bytes; Delete all saved files moves completed media to the Recycle Bin after confirmation. Settings can identify and recycle orphaned partials while retaining resumable jobs.
+## License and acknowledgements
+
+A project license has not been selected yet. Third-party dependencies retain their own licenses, viewable from **Settings → About → Third-party licenses**. Built with Electron, Teleproto, electron-updater and SQLite. Season Shelf is an independent client, not affiliated with Telegram.

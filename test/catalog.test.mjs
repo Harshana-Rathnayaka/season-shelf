@@ -120,3 +120,16 @@ test("consecutive combined episodes meet quality rules and are selected once wit
  assert.equal(episode("Show_S01E01-02_720p_x265.mkv").episodeEnd,2);
  assert.ok(episode("Show.S01E01E02E03.720p.x265.mkv").reason);
 });
+
+test('spaces participate in season separator voting and minority spaces match dots',()=>{
+  const file=(filename,id)=>({filename,id,season:1});
+  const names=normalizeSeasonNames([file('Show S01E01 720p WEB-DL x265.mkv','1'),file('Show S01E02 720p WEB-DL x265.mkv','2'),file('Show.S01E03.720p.WEB-DL.x265.mkv','3')]);
+  assert.equal(names[2].destinationFilename,'Show S01E03 720p WEB-DL x265.mkv');
+  const dots=normalizeSeasonNames([file('Show.S01E01.720p.x265.mkv','1'),file('Show.S01E02.720p.x265.mkv','2'),file('Show S01E03 720p x265.mkv','3')]);
+  assert.equal(dots[2].destinationFilename,'Show.S01E03.720p.x265.mkv');
+});
+
+test('spaces surrounding dashes do not outvote the dash delimiter',()=>{
+  const items=['Show - S01E01 - 720p - x265.mkv','Show - S01E02 - 720p - x265.mkv','Show.S01E03.720p.x265.mkv'].map((filename,index)=>({filename,id:String(index),season:1}));
+  assert.equal(normalizeSeasonNames(items)[2].destinationFilename,'Show-S01E03-720p-x265.mkv');
+});

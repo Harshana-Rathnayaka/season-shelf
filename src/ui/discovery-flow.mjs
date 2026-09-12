@@ -1,5 +1,5 @@
 export async function advanceDiscovery(method, payload, {call, cancelled, onStage}) {
-  const automatic = ["discovery-search","discovery-follow"].includes(method);
+  const automatic = ["discovery-search","discovery-follow","complete-subscriptions"].includes(method);
   for (let step=0; step<8; step++) {
     if (cancelled()) return null;
     onStage(method);

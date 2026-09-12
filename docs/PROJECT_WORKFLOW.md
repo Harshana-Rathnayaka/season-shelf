@@ -60,7 +60,7 @@ Do not create “in review”, “merged” or “done” labels; GitHub already
 | --- | --- | --- |
 | PR or development branch push | `CI` | Install dependencies, syntax checks, tests, label-definition validation; no installer/publishing |
 | Label definition change | `Sync repository labels` | Create/update the configured repository labels |
-| Stable `vX.Y.Z` tag push | `Windows release` | Runs only when `RELEASES_ENABLED=true`; validates version and ancestry, tests, builds signed NSIS artifacts and publishes them |
+| Stable `vX.Y.Z` tag push | `Desktop release` | Runs only when `RELEASES_ENABLED=true`; validates version and ancestry, tests Windows/macOS, builds signed NSIS and notarized universal macOS assets, and publishes only after both succeed |
 
 The release workflow already performs both artifact construction and publication. **A second build workflow is not required.** `npm run release:win` invokes electron-builder with publishing enabled; it produces the installer, blockmap and update manifest in that same job and uploads them to GitHub Releases.
 
@@ -72,10 +72,10 @@ Originally, any `v*` tag matching package.json could publish immediately. The re
 2. Create a release PR with matching package.json/package-lock.json version and reviewed release notes; merge it into `master` after checks pass.
 3. A maintainer enables `RELEASES_ENABLED=true`. Protect `v*` tags with a ruleset if desired.
 4. Tag the intended merged commit, for example `v0.2.0`, and push that single tag. Never use a broad `git push --tags` as a casual development command.
-5. The one release workflow validates, tests, packages and publishes. Check the GitHub Release contains the EXE, blockmap and `latest.yml`; installed apps discover that manifest.
+5. The one release workflow validates, tests, packages and publishes. Check the release contains the EXE, DMG, ZIP, blockmaps, `latest.yml` and `latest-mac.yml`; installed apps use their platform manifest.
 6. Never move or reuse a published version tag. Fix a bad release with a new patch version. Beta channels require a separate intentional policy before enabling them; the current workflow accepts stable versions only.
 
-GitHub normally generates source archives for a tag/release; those archives are **not** an Electron installer. Our workflow builds the Windows application assets explicitly.
+GitHub normally generates source archives for a tag/release; those archives are **not** an Electron installer. Our workflow builds Windows and macOS application assets explicitly.
 
 ## Sources
 

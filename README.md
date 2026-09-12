@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml"><img src="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/platform-Windows-357EC7?style=flat-square" alt="Windows">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-357EC7?style=flat-square" alt="Windows and macOS build targets">
   <img src="https://img.shields.io/badge/status-in_development-A0E4C6?style=flat-square" alt="In development">
 </p>
 <p align="center"><a href="#get-started">Get started</a> ? <a href="CONTRIBUTING.md">Contribute</a> ? <a href="docs/PROJECT_WORKFLOW.md">Branches &amp; releases</a> ? <a href="docs/NEXT_SESSION.md">Roadmap</a></p>

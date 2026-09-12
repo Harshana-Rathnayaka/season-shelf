@@ -1,16 +1,16 @@
-﻿name: Windows release
+﻿name: Desktop release
 on:
   push:
     tags: ['v*']
 permissions:
   contents: write
 concurrency:
-  group: windows-release
+  group: desktop-release
   cancel-in-progress: false
 jobs:
-  windows:
+  prepare:
     if: vars.RELEASES_ENABLED == 'true'
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -18,21 +18,83 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
-          cache: npm
       - name: Validate release source and version
-        shell: pwsh
         run: |
-          $version = node -p "require('./package.json').version"
-          if ($env:GITHUB_REF_NAME -notmatch '^v\d+\.\d+\.\d+$') { throw 'Only stable semantic version tags are supported' }
-          if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag must match package.json version' }
+          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("package.json")); const tag=process.env.GITHUB_REF_NAME; if (!/^v\d+\.\d+\.\d+$/.test(tag) || tag !== `v${p.version}`) throw Error("Stable tag must match package.json version");'
           git merge-base --is-ancestor HEAD origin/master
-          if ($LASTEXITCODE -ne 0) { throw 'Release commit must already be merged into master' }
+      - name: Create or reuse an unpublished draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --json isDraft > release-state.json; then
+            node -e 'if (!require("./release-state.json").isDraft) throw Error("Never overwrite a published release; create a new version")'
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Season Shelf $GITHUB_REF_NAME" --generate-notes
+          fi
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            command: release:win
+            certificate: CSC_LINK
+            password: CSC_KEY_PASSWORD
+          - platform: macos
+            os: macos-latest
+            command: release:mac
+            certificate: MAC_CSC_LINK
+            password: MAC_CSC_KEY_PASSWORD
+    runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CSC_LINK: ${{ secrets[matrix.certificate] }}
+      CSC_KEY_PASSWORD: ${{ secrets[matrix.password] }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Require signing and notarization credentials
+        run: node -e "const names=['CSC_LINK','CSC_KEY_PASSWORD']; if(process.platform==='darwin') names.push('APPLE_ID','APPLE_APP_SPECIFIC_PASSWORD','APPLE_TEAM_ID'); for(const name of names) if(!process.env[name]) throw Error('Missing release secret '+name)"
       - run: npm ci
       - run: npm run check
       - run: npm test
-      - name: Build signed installer and publish release assets
-        run: npm run release:win -- --config.forceCodeSigning=true
+      - name: Build signed assets and upload to the draft
+        run: npm run ${{ matrix.command }} -- --config.forceCodeSigning=true --config.publish.releaseType=draft
+      - name: Verify macOS signature and notarization ticket
+        if: matrix.platform == 'macos'
+        run: |
+          codesign --verify --deep --strict "release/mac-universal/Season Shelf.app"
+          xcrun stapler validate "release/mac-universal/Season Shelf.app"
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify both platforms and publish the complete release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --json isDraft,assets > release-state.json
+          node <<'NODE'
+          const release = require('./release-state.json');
+          if (!release.isDraft) throw Error('Expected an unpublished draft');
+          const version = process.env.GITHUB_REF_NAME.slice(1);
+          const names = new Set(release.assets.map(asset => asset.name));
+          for (const name of [
+            `Season-Shelf-Setup-${version}-x64.exe`,
+            `Season-Shelf-Setup-${version}-x64.exe.blockmap`,
+            'latest.yml',
+            `Season-Shelf-${version}-mac-universal.dmg`,
+            `Season-Shelf-${version}-mac-universal.zip`,
+            'latest-mac.yml',
+          ]) if (!names.has(name)) throw Error(`Missing release asset: ${name}`);
+          NODE
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest

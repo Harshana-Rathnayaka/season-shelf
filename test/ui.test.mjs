@@ -39,7 +39,7 @@ async function fixture(t, bootstrap = null, handler = null) {
     await Promise.all(files.map((file) => fs.readFile(file, "utf8")))
   )
     .map((text) =>
-      text.replace(/^import .*;\n/gm, "").replace(/^export /gm, ""),
+      text.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""),
     )
     .join("\n");
   await window.eval(`(async () => {${code}\n})()`);

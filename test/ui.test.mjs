@@ -386,3 +386,25 @@ test('missing history has no navigation badge and an empty batch hides its progr
   f.click('[data-page="settings"]');assert.deepEqual(Array.from(f.document.querySelectorAll('.settings-group > h2'),e=>e.textContent),['Appearance','Downloads and storage','Channel filtering','Data and activity','About']);
   assert.equal(f.document.querySelector('#account-popover [data-page="settings"]'),null);
 });
+
+test('empty and unverified-only channels keep quality, tab and search controls in stable slots',async t=>{
+  for(const items of [[],[parseEpisode({id:'u',filename:'Unknown.mkv',size:123,peer:{id:'1'}})]]) {
+    const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[],catalogue:{channel:{id:'1',title:'Empty channel'},items}});
+    for(const tab of ['verified','unverified']) {
+      f.click(`[data-tab="${tab}"]`);
+      assert.ok(f.document.querySelector('.library-controls > .quality-area > .quality-empty'));
+      assert.ok(f.document.querySelector('.library-controls > .library-list-switch'));
+      assert.ok(f.document.querySelector('.library-controls > .catalogue-tools .table-search'));
+    }
+  }
+});
+
+test('disabled schedule retains chosen hours and enabling it restores both time inputs',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark',transfer:{speedKiB:200,scheduled:false,start:'22:30',end:'06:15'}},jobs:[],channels:[]},async(method,payload)=>method==='settings'?payload:{});
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  let form=f.document.querySelector('#transfer-form');assert.equal(form.querySelector('.schedule-times').disabled,true);
+  form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));
+  const saved=f.calls.find(c=>c.method==='settings').payload.transfer;
+  assert.equal(saved.start,'22:30');assert.equal(saved.end,'06:15');assert.equal(saved.scheduled,false);
+  form=f.document.querySelector('#transfer-form');f.click('[name="scheduled"]');assert.equal(form.querySelector('.schedule-times').disabled,false);
+});

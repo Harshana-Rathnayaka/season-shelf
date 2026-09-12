@@ -1,11 +1,14 @@
-﻿<div align="center">
-  <img src="src/desktop/assets/icon.png" width="88" alt="Season Shelf icon">
-  <h1>Season Shelf</h1>
-  <p><strong>Your series. Your folders. A little less clicking.</strong></p>
-  <p>A Windows desktop companion for organising and downloading episode files from Telegram.</p>
-  <p><a href="#get-started">Get started</a> · <a href="docs/DEVELOPMENT.md">Development</a> · <a href="docs/NEXT_SESSION.md">Roadmap</a></p>
-  <p><strong>In development</strong> · Electron · JavaScript · SQLite · Teleproto</p>
-</div>
+<p align="center"><img src="docs/assets/readme-banner.svg" alt="Season Shelf — Your series, beautifully organised" width="100%"></p>
+
+<p align="center">
+  <a href="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml"><img src="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/platform-Windows-357EC7?style=flat-square" alt="Windows">
+  <img src="https://img.shields.io/badge/status-in_development-A0E4C6?style=flat-square" alt="In development">
+</p>
+<p align="center"><a href="#get-started">Get started</a> ? <a href="CONTRIBUTING.md">Contribute</a> ? <a href="docs/PROJECT_WORKFLOW.md">Branches &amp; releases</a> ? <a href="docs/NEXT_SESSION.md">Roadmap</a></p>
+
+> **A calmer way to build your collection.** Choose episodes in Telegram channels. Keep the files in folders you control.
+
 
 ![Season Shelf series library, using illustrative sample data](docs/assets/library-preview.png)
 
@@ -66,7 +69,7 @@ Filename normalization uses completed, app-managed files from the same season an
 
 ## Updates, when releases begin
 
-The updater targets this repository's GitHub Releases. Installed builds check at startup and daily, download available updates, then offer **Restart now** or **Not now**. Deferred updates install on the next launch after release and download verification; that check requires connectivity. Active work must finish before installation.
+Release publishing is disabled until the maintainer enables `RELEASES_ENABLED` and configures signing. The updater targets this repository's GitHub Releases. Installed builds check at startup and daily, download available updates, then offer **Restart now** or **Not now**. Deferred updates install on the next launch after release and download verification; that check requires connectivity. Active work must finish before installation.
 
 Development mode does not install updates. Packaging is intentionally separate from everyday development. See [release and signing instructions](docs/RELEASES.md).
 

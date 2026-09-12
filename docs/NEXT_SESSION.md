@@ -1,3 +1,12 @@
+## Current branch: workspace polish and repository workflow
+
+- Created feat/workspace-polish-and-project-workflow from feat/discovery-recovery-and-compact-ui and pushed the existing work as 5082974. PR #1 remains open against master; its branch was not modified.
+- Fixed search focus on its rounded container, stable quality/tab/search/season layout slots including empty and unverified-only channels, and redesigned the bandwidth/schedule form. Disabling the schedule retains its stored hours.
+- Verified actual Electron geometry across six channel/tab combinations: tabs x=265 and search x=1003 in every case, with aligned centers. Visually inspected focus, empty/unverified states and transfer controls. Added DOM regressions and rebuilt the sample preview; no installer built.
+- Added branded README artwork, contributor and PR guides, CI, 13 canonical label definitions plus a sync workflow, and a guarded release workflow. Tags do not publish unless RELEASES_ENABLED=true, version/ancestry checks pass and signing succeeds. All tag releases must be stable versions merged into master.
+- Repository audit: default master, PR #1 parent feature branch -> master, public repository, no rulesets returned (classic protection not assumed absent). CLI API login failed; the GitHub connector works for inspection. Labels are created via repository Actions, with final outcome recorded below.
+- No new PR, merge, force push, protection change or release was performed. A child PR should initially target the parent feature branch. See docs/PROJECT_WORKFLOW.md for the stack and squash/rebase caveat.
+
 ## 12 September: settings, reset controls, sign-in and filename follow-up
 
 Completed in source (development only; DO NOT rebuild/publish installers until requested):

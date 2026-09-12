@@ -1,0 +1,67 @@
+[
+  {
+    "name": "bug",
+    "color": "d73a4a",
+    "description": "A confirmed defect or regression"
+  },
+  {
+    "name": "enhancement",
+    "color": "a2eeef",
+    "description": "A new capability or user-facing improvement"
+  },
+  {
+    "name": "documentation",
+    "color": "0075ca",
+    "description": "Documentation, examples or contributor guidance"
+  },
+  {
+    "name": "maintenance",
+    "color": "c5def5",
+    "description": "Refactoring, dependencies or repository tooling"
+  },
+  {
+    "name": "area: ui",
+    "color": "bfdadc",
+    "description": "Layout, accessibility and renderer interactions"
+  },
+  {
+    "name": "area: downloads",
+    "color": "1d76db",
+    "description": "Queue, transfer policy, file integrity and naming"
+  },
+  {
+    "name": "area: telegram",
+    "color": "5319e7",
+    "description": "Authentication, channel scans and bot discovery"
+  },
+  {
+    "name": "area: desktop",
+    "color": "0052cc",
+    "description": "Electron lifecycle, tray, IPC and operating-system integration"
+  },
+  {
+    "name": "area: release",
+    "color": "fbca04",
+    "description": "Packaging, signing, CI and updates"
+  },
+  {
+    "name": "priority: high",
+    "color": "b60205",
+    "description": "High-impact work that should be addressed next"
+  },
+  {
+    "name": "blocked",
+    "color": "e4e669",
+    "description": "Waiting for a stated dependency or decision"
+  },
+  {
+    "name": "good first issue",
+    "color": "7057ff",
+    "description": "A small, explained task suitable for a first contribution"
+  },
+  {
+    "name": "help wanted",
+    "color": "008672",
+    "description": "Contributions are welcome and the scope is ready"
+  }
+]

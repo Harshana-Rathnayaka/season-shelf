@@ -147,3 +147,6 @@ The final local suite contains 16 passing tests. DOM interaction tests use JSDOM
 The build environment could not launch Electron because native desktop/socket facilities were restricted. The Cloud browser blocked localhost and local-file preview by policy. No rendered screenshot or visual verification is claimed. `docs/preview.html` is a self-contained sample-only interface for manual review.
 
 Final packaging check: NSIS build completed; all 34 packaged source/assets match the workspace and latest.yml SHA-512 matches the installer. Authenticode status is NotSigned. No release was published.
+
+## Library positioning and project workflow
+104 tests pass; syntax and workflow YAML checks pass. Actual Electron checks cover mixed, unverified-only and empty catalogues on both tabs. Identical tab/search X positions and aligned centers across all six cases. Reviewed focused search and redesigned transfer controls. No EXE rebuilt.

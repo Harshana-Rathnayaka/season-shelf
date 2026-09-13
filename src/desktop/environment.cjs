@@ -6,14 +6,12 @@ const definitions = {
 
 exports.resolveEnvironment = ({isPackaged, metadata = {}, argv = []}) => {
   // Installed identity comes from build metadata, never a launch argument.
-  const flags = argv.filter(value => value.startsWith('--environment='));
-  if (!isPackaged && flags.length > 1) throw new Error('Specify one environment');
-  const environment = isPackaged ? (metadata.appEnvironment || 'production') : (flags[0]?.split('=')[1] || 'development');
+  const environment = isPackaged ? (metadata.appEnvironment || 'production') : 'development';
   if (!Object.hasOwn(definitions, environment) || (isPackaged && environment === 'development')) {
     throw new Error('Invalid application environment');
   }
   const definition = definitions[environment];
-  return {...definition, environment, name: !isPackaged && environment === 'production' ? 'Season Shelf Production Preview' : definition.name,
+  return {...definition, environment,
     liveReload: !isPackaged && environment === 'development' && argv.includes('--dev')};
 };
 

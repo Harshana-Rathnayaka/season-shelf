@@ -30,16 +30,14 @@ Install dependencies with `npm ci`, then use `npm run dev`. In VS Code, open Run
 
 Use `npm` on macOS and `npm.cmd` in Windows PowerShell if needed. Close an existing instance of the same profile before debugging; the single-instance lock otherwise focuses it. Do not set ELECTRON_RUN_AS_NODE when launching Electron (the VS Code configurations clear it).
 
-UI edits reload the renderer. Backend edits restart only once downloads, naming and authentication are idle. This is reload, not state-preserving hot module replacement: unsaved UI state may reset and unfinished jobs return paused. An automatic backend relaunch may end the debug session; press F5 again to debug it after closing that instance. Use the Development menu for manual reload or restart when idle.
+After a short save debounce, UI edits reload the renderer and backend edits request an immediate restart through normal shutdown. There is no wait for downloads or authentication to become idle. Pending sign-in/discovery prompts are cancelled on UI reload. This is reload, not state-preserving hot module replacement: unsaved UI state may reset and unfinished jobs return paused. An automatic backend relaunch may end the debug session; press F5 again to debug it after closing that instance. Use the Development menu for manual reload or Restart app.
 
 | Command / VS Code configuration | Profile and purpose |
 | --- | --- |
 | `npm run dev` / Electron: Development | Existing development data; automatic reload and DevTools |
 | `npm start` | Same development profile without automatic reload |
-| `npm run start:uat` / Electron: UAT preview | Separate source UAT data; no automatic reload or real updates |
-| `npm run start:prod` / Electron: Production preview | Separate local production preview; never uses installed production data |
 
-Installed UAT and production also have separate names, app IDs, Chromium storage, login/history and updater channels. Build metadata selects an installed app's environment; command-line flags cannot change it. Source previews are not substitutes for testing signed installers. All environments use the real Telegram service when you sign in; UAT is not a Telegram sandbox. Choose separate download folders when testing, as profile isolation cannot isolate a folder you manually select in both apps.
+Use development for coding and packaged builds for acceptance testing. UAT is an optional prerelease distribution, not another source-run mode. Installed UAT and production have separate names, app IDs, Chromium storage, login/history and updater channels. Build metadata selects an installed app's environment; command-line flags cannot change it. There are no separate local UAT/production-preview commands. All environments use the real Telegram service when you sign in; UAT is not a Telegram sandbox. Choose separate download folders when testing, as profile isolation cannot isolate a folder you manually select in both apps.
 
 See [release setup](docs/RELEASES.md) for UAT packaging and update channels. This project uses Electron's npm/VS Code workflow and electron-builder; a bundler is not required for its plain HTML/CSS/JavaScript renderer. See [Electron's setup and debugging guide](https://www.electronjs.org/docs/latest/tutorial/tutorial-first-app).
 

@@ -461,7 +461,11 @@ app
     await win.loadFile(uiFile);
     if (runtime.liveReload) {
       const { enableDevelopment } = require("./development.cjs");
-      enableDevelopment({ app, win, queue, adapter, isAuthenticating: () => !!authPrompt || adapter.connecting || scanning || !!discovery.operation });
+      enableDevelopment({ app, win, beforeReload: () => {
+        authPrompt?.reject(new Error('Sign-in cancelled by development reload'));
+        authPrompt = null;
+        discovery?.cancel();
+      } });
     }
   })
   .catch((error) => {

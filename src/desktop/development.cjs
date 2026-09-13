@@ -2,18 +2,19 @@ const { watch } = require("node:fs");
 const path = require("node:path");
 const { Menu } = require("electron");
 
-exports.enableDevelopment = ({ app, win, queue, isAuthenticating }) => {
-  let uiChanged = false, backendChanged = false, debounce;
+exports.enableDevelopment = ({ app, win, beforeReload = () => {} }) => {
+  let uiChanged = false, backendChanged = false, debounce, restarting = false;
   const applyChanges = () => {
-    if (isAuthenticating()) return;
+    if (restarting) return;
     if (backendChanged) {
-      // Do not interrupt a real download or a naming operation to restart code.
-      if (queue.running.size || queue.namingLocks.size) return;
+      // Request normal shutdown now; the shared quit handler stops active work.
+      restarting = true;
       backendChanged = false;
       app.relaunch();
       app.quit();
     } else if (uiChanged && !win.isDestroyed()) {
       uiChanged = false;
+      beforeReload();
       win.webContents.reloadIgnoringCache();
     }
   };
@@ -22,19 +23,18 @@ exports.enableDevelopment = ({ app, win, queue, isAuthenticating }) => {
     if (name.replaceAll("\\", "/").startsWith("ui/")) uiChanged = true;
     else {
       backendChanged = true;
-      console.log("Backend changed. Restarting when downloads and sign-in are idle.");
+      console.log("Backend changed. Restarting with normal shutdown.");
     }
     clearTimeout(debounce);
     debounce = setTimeout(applyChanges, 350);
   });
   watcher.on("error", error => console.error("Development watcher:", error.message));
-  const pending = setInterval(applyChanges, 1000);
   Menu.setApplicationMenu(Menu.buildFromTemplate([{ label: "Development", submenu: [
     { label: "Reload UI", accelerator: "CmdOrCtrl+R", click: () => { uiChanged = true; applyChanges(); } },
     { role: "toggleDevTools" },
-    { label: "Restart when idle", click: () => { backendChanged = true; applyChanges(); } },
+    { label: "Restart app", click: () => { backendChanged = true; applyChanges(); } },
     { type: "separator" }, { role: "quit" },
   ] }]));
-  app.once("before-quit", () => { watcher.close(); clearInterval(pending); clearTimeout(debounce); });
-  console.log("Development mode: UI changes reload automatically; backend changes restart when idle. Ctrl+Shift+I opens DevTools.");
+  app.once("before-quit", () => { watcher.close(); clearTimeout(debounce); });
+  console.log("Development mode: UI changes reload automatically; backend changes restart immediately through normal shutdown. Ctrl+Shift+I opens DevTools.");
 };

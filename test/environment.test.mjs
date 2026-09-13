@@ -12,18 +12,18 @@ const require = createRequire(import.meta.url);
 test('packaged identity ignores launch overrides and development defaults are explicit', () => {
   assert.equal(resolveEnvironment({isPackaged:false}).environment, 'development');
   assert.equal(resolveEnvironment({isPackaged:false,argv:['--dev']}).liveReload, true);
-  assert.equal(resolveEnvironment({isPackaged:false,argv:['--environment=uat','--dev']}).liveReload, false);
+  assert.equal(resolveEnvironment({isPackaged:false,argv:['--environment=uat','--dev']}).environment, 'development');
   assert.equal(resolveEnvironment({isPackaged:true,metadata:{appEnvironment:'uat'},argv:['--environment=production','--dev']}).environment, 'uat');
   assert.equal(resolveEnvironment({isPackaged:true,argv:['--environment=uat']}).environment, 'production');
-  assert.throws(() => resolveEnvironment({isPackaged:false,argv:['--environment=unknown']}), /Invalid/);
-  assert.throws(() => resolveEnvironment({isPackaged:false,argv:['--environment=uat','--environment=production']}), /one environment/);
+  assert.throws(() => resolveEnvironment({isPackaged:true,metadata:{appEnvironment:'unknown'}}), /Invalid/);
+  assert.equal(resolveEnvironment({isPackaged:false,argv:['--environment=production']}).environment, 'development');
 });
 
 test('source and installed environments isolate storage while preserving production data', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'shelf-environments-'));
   t.after(() => fs.rm(root,{recursive:true,force:true}));
   const dirs = [];
-  for (const [environment,isPackaged] of [['development',false],['uat',false],['production',false],['uat',true],['production',true]]) {
+  for (const [environment,isPackaged] of [['development',false],['uat',true],['production',true]]) {
     const paths={appData:root,userData:path.join(root,'season-shelf')};
     const app={isPackaged,getPath:key=>paths[key],setPath:(key,value)=>paths[key]=value};
     const dir=configureProfile(app,environment);

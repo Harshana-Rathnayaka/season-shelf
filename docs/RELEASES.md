@@ -73,7 +73,7 @@ Complete native signed install/update acceptance on a Mac before the first publi
 
 References: [electron-builder v26 macOS configuration](https://www.electron.build/v26/docs/mac/), [publishing](https://www.electron.build/v26/docs/publish/) and [notarization integration](https://github.com/electron/notarize).
 
-## UAT and production flavours
+## Optional UAT prereleases
 
 Production keeps the existing app ID and installed profile. UAT builds use **Season Shelf UAT**, app ID `local.seasonshelf.desktop.uat` and the `uat` update channel. Production accepts only stable versions; UAT accepts only `X.Y.Z-uat.N` versions. Channel selection disables downgrades, and runtime checks reject cross-environment updates even if a provider returns an unexpected release.
 
@@ -86,6 +86,6 @@ Production output is in `release/`; UAT output is in `release/uat/`. A local UAT
 
 The gated tag workflow chooses the correct build configuration. UAT publishes a GitHub prerelease, never marks it latest, and includes `uat.yml` and `uat-mac.yml`. Production publishes the stable release with `latest.yml` and `latest-mac.yml`. Both require signing, notarization and complete Windows/macOS assets. Keep the publishing gate disabled until signed install/update acceptance succeeds.
 
-Installed profiles live under the OS application-data directory: `Season Shelf/installed` for production and `Season Shelf UAT/installed` for UAT. Source UAT uses `Season Shelf UAT/development`; source production previews use `Season Shelf/production-preview`. Existing source-development storage stays in place. No sessions or history are copied between them.
+Installed profiles live under the OS application-data directory: `Season Shelf/installed` for production and `Season Shelf UAT/installed` for UAT. Source launches always use the existing development profile. No sessions or history are copied between profiles. Former source-preview folders, if created, are left untouched but are no longer used.
 
-See [electron-builder update channels](https://www.electron.build/v26/docs/tutorials/release-using-channels/). Environment names are project configuration, not a special Electron flavour API.
+See [electron-builder update channels](https://www.electron.build/v26/docs/tutorials/release-using-channels/). For this app, development plus production is the everyday workflow; UAT is only a separately installed prerelease for acceptance testing.

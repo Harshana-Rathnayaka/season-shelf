@@ -39,7 +39,7 @@ npm.cmd test
 node scripts/build-preview.mjs
 ```
 
-Preview output is committed when the UI changes. Installer builds are not part of the ordinary development loop. Explain any live Telegram or Windows-only verification you could not perform.
+Preview output is committed when the UI changes. Installer builds are not part of the ordinary development loop. Explain any live Telegram or platform-specific verification you could not perform.
 
 ## Open the PR
 

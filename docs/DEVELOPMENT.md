@@ -1,5 +1,7 @@
 # Develop Season Shelf with live feedback
 
+For cloning, dependencies and Windows/macOS launch commands, start with [Getting started](GETTING_STARTED.md). Use `npm` in macOS Terminal and `npm.cmd` in Windows PowerShell.
+
 Close a normally launched Season Shelf instance once, then double-click **Dev.cmd**, or run:
 
 ```powershell
@@ -20,4 +22,14 @@ Electron uses ordinary HTML/CSS for its interface. There is no built-in drag-and
 
 `Preview.cmd` / `npm.cmd run preview` remains a sample-only browser preview. It cannot log into Telegram or download files. The desktop development mode is the one to use for real application behaviour.
 
-The development watcher has offline tests for UI reload during downloads and delayed backend restart. Native visual/relaunch acceptance still needs checking on the user's running app.
+## Routine checks
+
+```sh
+npm run check
+npm test
+node scripts/build-preview.mjs
+```
+
+Use `npm.cmd` instead of `npm` in PowerShell. Regenerate the standalone preview when UI source changes; documentation-only changes do not require rebuilding it. Normal CI runs syntax checks and tests on Windows and macOS without packaging installers.
+
+The development watcher has offline tests for UI reload during downloads and delayed backend restart. See [validation status](VALIDATION.md) for native acceptance limits and [contributing](../CONTRIBUTING.md) for PR expectations.

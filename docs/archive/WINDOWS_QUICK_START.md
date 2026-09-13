@@ -1,3 +1,5 @@
+> Historical record through 12 September 2026. May describe superseded behaviour. See [current documentation](../README.md).
+
 # Test Season Shelf on your Windows PC
 
 ## Put the files in your chosen folder

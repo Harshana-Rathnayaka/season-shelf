@@ -1,3 +1,5 @@
+> Historical record through 12 September 2026. May describe superseded behaviour. See [current documentation](../README.md).
+
 # Channel filter keywords — review before enabling
 
 The current list plus the explicitly approved standalone words signals, gold, profit, market and exchange are active defaults. Settings now supports editing this list. Other proposed additions below have NOT been integrated. Edit this file or send additions/removals in chat.

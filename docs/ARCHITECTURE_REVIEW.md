@@ -1,3 +1,5 @@
+> Technical reference with dated findings. For current scope and acceptance, see [roadmap](ROADMAP.md) and [validation](VALIDATION.md). Later corrections in this document supersede earlier assumptions.
+
 ## Follow-up implementation
 
 Automatic discovery sequencing is isolated in src/ui/discovery-flow.mjs with cancellation and redirect bounds. Callback payloads and peer context remain in the main-process Discovery service; the renderer receives opaque choice IDs. Windows title bar theme IPC accepts validated hex colours only, retaining native window buttons and existing sender checks. Larger renderer/page and IPC module extraction remains future work.

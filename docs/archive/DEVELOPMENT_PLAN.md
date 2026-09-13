@@ -1,3 +1,5 @@
+> Historical record through 12 September 2026. May describe superseded behaviour. See [current documentation](../README.md).
+
 # Development plan
 
 ## Current position

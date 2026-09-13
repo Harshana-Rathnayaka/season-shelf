@@ -1,12 +1,8 @@
 ﻿# Branches, PRs and releases
 
-## Current repository state
+## Repository baseline
 
-- Default branch: `master` (not `main`). Renaming is optional; do not change it while an open stack depends on it.
-- PR #1: `feat/discovery-recovery-and-compact-ui` -> `master`.
-- New child branch: `feat/workspace-polish-and-project-workflow`, created from that PR branch. The first child commit is `5082974`; the parent PR branch was not pushed or amended by this task.
-- No repository rulesets were returned by the GitHub API during this audit. Classic branch protection is a separate setting and is not assumed absent.
-- Git SSH push works. Local GitHub CLI authentication returned HTTP 401, but the GitHub connector can inspect this repository. Labels are synchronized by an authenticated repository Actions job.
+The default branch is `master`. PRs #1, #2 and #3 have merged; new independent work starts from updated `master`. CI checks Windows and macOS. Release publishing is explicitly gated. Labels are synchronized from `.github/labels.json` by repository Actions.
 
 ## Recommended model: GitHub flow
 
@@ -24,19 +20,17 @@ Use short-lived branches and merge reviewed PRs into `master`. A permanent `deve
 
 Issue numbers are optional. Avoid personal names, dates and long-lived “working”, “dev” or “latest” branches.
 
-### The current stack
+### Dependent PRs
 
-A PR from the new child branch should initially target `feat/discovery-recovery-and-compact-ui`, so reviewers see only its new commits. No new PR has been opened automatically in this task.
+When work depends on an open PR, branch from its head and initially target that branch so reviewers see only the new changes. Merge the parent first, then update the child base to `master`.
 
-Merge PR #1 first. Then move the child work onto the updated `master` and retarget its PR. If the parent used a merge commit, a normal base update is usually enough. If it was squash-merged, Git sees different parent commit IDs: simply changing the PR base can show duplicate changes.
-
-For an exclusively owned child branch, save the old parent tip before merging, then use `git rebase --onto origin/master <old-parent-tip> <child-branch>` and `git push --force-with-lease`. Never blindly force-push or rewrite somebody else's branch. A safer shared-branch alternative is a fresh branch from updated `master` with only the child commits cherry-picked. These are maintenance instructions; no rebase, merge or force push was performed here.
+A parent merge commit preserves ancestry. A squash merge changes commit IDs, so retargeting alone can show duplicate changes. On an exclusively owned child branch, save the old parent tip, then use `git rebase --onto origin/master <old-parent-tip> <child-branch>` and `git push --force-with-lease`. Coordinate history changes with collaborators. For a shared branch, a fresh branch from `master` with only the child commits cherry-picked avoids rewriting shared history.
 
 ## PR and history policy
 
 Prefer **squash and merge** for independent short-lived PRs: one reviewed outcome becomes one useful `master` commit. Use Conventional Commit-style PR titles. The PR keeps discussion and intermediate commits accessible; the mainline stays easy to scan and revert. Avoid merging unrelated fixes, refactors and release work together.
 
-Recommended repository settings (not silently applied): require PRs and the `Windows checks` status check; block force pushes/deletion on `master`; resolve review conversations; allow squash merges. For a solo maintainer, do not require an impossible self-approval. Add one independent approval when another maintainer is available. Configure checks after CI has reported its first run.
+Recommended repository settings (not silently applied): require PRs and the `Windows checks` and `macOS checks` status checks; block force pushes/deletion on `master`; resolve review conversations; allow squash merges. For a solo maintainer, do not require an impossible self-approval. Add one independent approval when another maintainer is available. Configure checks after CI has reported its first run.
 
 Use tags for versions, labels for issue/PR categorization, and milestones for a planned release. None of these replaces a focused PR description.
 

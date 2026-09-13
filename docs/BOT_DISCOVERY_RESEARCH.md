@@ -1,3 +1,5 @@
+> Technical reference with dated findings. For current scope and acceptance, see [roadmap](ROADMAP.md) and [validation](VALIDATION.md). Later corrections in this document supersede earlier assumptions.
+
 ## Implementation update - 11 September 2026
 
 Supported inline callback buttons now retain exact bytes and source peer/message ID and use messages.getBotCallbackAnswer after checking the current keyboard. Returned Telegram URLs and edits to the source keyboard are captured. Replies are re-fetched by ID after thread polling to retrieve current markup. Sole eligible results continue automatically through Start and join; multiple results require selection. Unsupported buttons are shown rather than silently discarded. This supersedes earlier statements that all callbacks are unsupported. Separate newly sent callback replies and subscription workflows remain incomplete; live MCF compatibility is unverified.

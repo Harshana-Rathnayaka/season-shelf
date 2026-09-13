@@ -141,3 +141,19 @@ test('Windows startup and daily checks download in-app, then restart invokes the
   assert.equal(handlers['update-status']().state,'ready');
   await handlers['update-install']();assert.deepEqual(launched,[false,true]);
 });
+
+test('update checks persist their timestamp and reject duplicate clicks while pending',async()=>{
+  const updater=new EventEmitter();let finish;let calls=0;let saves=0;
+  updater.checkForUpdates=()=>{calls++;return new Promise(resolve=>finish=resolve);};
+  const settings={lastUpdateCheckAt:'2026-01-01T00:00:00.000Z'};const handlers={};
+  const {installUpdates}=await load('src/desktop/updates.cjs',{autoUpdater:updater});
+  installUpdates({app:{isPackaged:true,getVersion:()=> '1.0.0'},handle:(n,f)=>handlers[n]=f,notify(){},settings:()=>settings,saveSettings:()=>saves++,busy:()=>false,beforeInstall:async()=>{}});
+  assert.equal(handlers['update-status']().lastCheckedAt,settings.lastUpdateCheckAt);
+  const pending=handlers['update-check']();
+  assert.equal(handlers['update-status']().state,'checking');
+  assert.equal(handlers['update-status']().lastCheckedAt,settings.lastUpdateCheckAt);
+  assert.notEqual(settings.lastUpdateCheckAt,'2026-01-01T00:00:00.000Z');
+  await handlers['update-check']();assert.equal(calls,1);assert.equal(saves,1);
+  updater.emit('update-not-available');finish();await pending;
+  assert.equal(handlers['update-status']().state,'current');
+});

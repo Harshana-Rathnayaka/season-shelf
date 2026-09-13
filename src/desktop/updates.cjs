@@ -9,7 +9,7 @@ exports.installUpdates=({app,runtime={environment:'production',channel:'latest'}
     handle('update-preference',()=>settings());
     return ()=>{};
   }
-  let status={state:app.isPackaged?'idle':'development',version:app.getVersion()};
+  let status={state:app.isPackaged?'idle':'development',version:app.getVersion(),lastCheckedAt:settings().lastUpdateCheckAt || null};
   let checking=false, installing=false;
   const deferredAtLaunch=settings().deferredUpdate;
   const later=()=>{settings().deferredUpdate=status.version;saveSettings();set("ready",{deferred:true});return status;};
@@ -50,6 +50,10 @@ exports.installUpdates=({app,runtime={environment:'production',channel:'latest'}
     if(!app.isPackaged) return status;
     if(checking || ['downloading','ready'].includes(status.state)) return status;
     checking=true;
+    const lastCheckedAt=new Date().toISOString();
+    settings().lastUpdateCheckAt=lastCheckedAt;
+    saveSettings();
+    set("checking",{lastCheckedAt,message:""});
     try {await autoUpdater.checkForUpdates();} catch(error){failed(error);}
     finally {checking=false;}
     return status;

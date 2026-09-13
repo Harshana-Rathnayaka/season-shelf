@@ -1756,3 +1756,7 @@ strong, h1, h2, h3, .button, .episode-copy strong { font-weight:var(--strong-wei
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .season-navigation[data-empty] { visibility:hidden; pointer-events:none; }
 .quality-area { min-height:44px; }
+
+.update-spinner { display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:update-spin .8s linear infinite; }
+@keyframes update-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .update-spinner { animation:none; } }

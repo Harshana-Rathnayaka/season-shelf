@@ -4,7 +4,6 @@ This is a prioritised direction, not a release schedule. Features listed below a
 
 ## Before the first public release
 
-- Choose a source-code license.
 - Build unsigned installers for Windows and macOS.
 - Validate installation and an upgrade from an earlier installed version on Windows and macOS, including preservation of login, history and preferences.
 - Complete live Telegram discovery, subscription, download/resume and collection acceptance checks. Measure transfer performance with comparable uncached files.

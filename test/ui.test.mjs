@@ -408,3 +408,17 @@ test('disabled schedule retains chosen hours and enabling it restores both time 
   assert.equal(saved.start,'22:30');assert.equal(saved.end,'06:15');assert.equal(saved.scheduled,false);
   form=f.document.querySelector('#transfer-form');f.click('[name="scheduled"]');assert.equal(form.querySelector('.schedule-times').disabled,false);
 });
+
+test('update check button shows loading until completion and displays the last check',async t=>{
+  let finish;const f=await fixture(t,{version:'1.0.0',settings:{theme:'dark'},channels:[],jobs:[]},async method=>method==='update-check'?new Promise(resolve=>finish=resolve):{state:'idle'});
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  assert.match(f.document.querySelector('.update-last-checked').textContent,/Never/);
+  f.click('[data-action="update-check"]');
+  assert.equal(f.document.querySelector('[data-action="update-check"]').disabled,true);
+  assert.ok(f.document.querySelector('.update-spinner'));
+  finish({state:'current',lastCheckedAt:'2026-09-14T10:00:00.000Z'});await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('[data-action="update-check"]').disabled,false);
+  assert.equal(f.document.querySelector('.update-spinner'),null);
+  assert.doesNotMatch(f.document.querySelector('.update-last-checked').textContent,/Never/);
+  assert.match(f.document.body.textContent,/MIT License/);
+});

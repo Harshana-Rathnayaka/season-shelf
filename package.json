@@ -38,7 +38,8 @@
     },
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE"
     ],
     "win": {
       "target": "nsis",
@@ -89,5 +90,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Harshana-Rathnayaka/season-shelf.git"
-  }
+  },
+  "license": "MIT"
 }

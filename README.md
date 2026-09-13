@@ -125,6 +125,6 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The app uses Electron, plain Java
 
 ## License and acknowledgements
 
-A source-code license has not been selected yet. Third-party dependencies retain their own licenses, available in **Settings > About > Third-party licenses**.
+Licensed under the [MIT License](LICENSE). Third-party dependencies retain their own licenses, available in **Settings > About > Third-party licenses**.
 
 Built with Electron, Teleproto, electron-updater and SQLite. Season Shelf is independent and is not affiliated with Telegram.

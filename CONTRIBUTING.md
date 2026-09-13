@@ -39,7 +39,7 @@ After a short save debounce, UI edits reload the renderer and backend edits requ
 
 Use development for coding and normal packaged builds for installer testing. Development and installed builds keep separate application data. Test fresh installs in a VM or separate OS account; updates preserve the installed profile. All builds use the real Telegram service and the download folders you select.
 
-See [release setup](docs/RELEASES.md) for local packaging, signing and publishing. This project uses Electron's npm/VS Code workflow and electron-builder; a bundler is not required for its plain HTML/CSS/JavaScript renderer. See [Electron's setup and debugging guide](https://www.electronjs.org/docs/latest/tutorial/tutorial-first-app).
+See [release setup](README.md#build-and-release) for local packaging and publishing. This project uses Electron's npm/VS Code workflow and electron-builder; a bundler is not required for its plain HTML/CSS/JavaScript renderer. See [Electron's setup and debugging guide](https://www.electronjs.org/docs/latest/tutorial/tutorial-first-app).
 
 ## Make a reviewable change
 
@@ -72,4 +72,4 @@ Recommended master protections: require PRs, passing Windows checks and macOS ch
 
 ## Releases
 
-Contributors should not create release tags as part of normal feature work. Version bumps and release notes belong in a maintainer-reviewed release PR. Only tag a tested commit already merged into `master`, after publishing has been enabled and signing configured. See [release instructions](docs/RELEASES.md).
+Contributors should not create release tags as part of normal feature work. Version bumps and release notes belong in a maintainer-reviewed release PR. Only tag a tested commit already merged into `master`, after publishing has been enabled. See [release instructions](README.md#build-and-release).

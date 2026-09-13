@@ -5,10 +5,10 @@ This is a prioritised direction, not a release schedule. Features listed below a
 ## Before the first public release
 
 - Choose a source-code license.
-- Configure Windows signing and Apple Developer signing/notarization credentials.
-- Validate signed installation and an upgrade from an earlier installed version on Windows and macOS, including preservation of login, history and preferences.
+- Build unsigned installers for Windows and macOS.
+- Validate installation and an upgrade from an earlier installed version on Windows and macOS, including preservation of login, history and preferences.
 - Complete live Telegram discovery, subscription, download/resume and collection acceptance checks. Measure transfer performance with comparable uncached files.
-- Enable publishing only after those checks pass. See [releases](RELEASES.md).
+- Enable publishing only after those checks pass. See [releases](../README.md#build-and-release).
 
 ## Next feature candidates
 

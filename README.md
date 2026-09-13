@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/status-in_development-A0E4C6?style=flat-square" alt="In development">
 </p>
 
-<p align="center"><a href="#get-started">Get started</a> &middot; <a href="docs/RELEASES.md">Release setup</a> &middot; <a href="docs/ROADMAP.md">Roadmap</a> &middot; <a href="CONTRIBUTING.md">Contribute</a></p>
+<p align="center"><a href="#get-started">Get started</a> &middot; <a href="README.md#build-and-release">Release setup</a> &middot; <a href="docs/ROADMAP.md">Roadmap</a> &middot; <a href="CONTRIBUTING.md">Contribute</a></p>
 
 **Download episodes from Telegram and organise them into season folders.** Choose a series, pick your quality and manage your collection from one desktop app.
 
@@ -30,7 +30,7 @@ Download and Watch folders keep permanent and viewing copies separate. You decid
 
 ## 🚀 Get started
 
-> **In development:** production installers are not published yet. Windows and macOS build workflows are configured; signed installation and update acceptance are still pending.
+> **In development:** production installers are not published yet. Windows and macOS build workflows are configured; installation and update acceptance are still pending.
 
 Install Node.js 24 or later and Git, then clone the project:
 
@@ -59,7 +59,7 @@ npm run dev
 
 Missing a channel? Select **All channels** or adjust **Settings > Channel filtering**. No verified results? Check other available qualities and Unverified. Replay onboarding from **Settings > About > Watch guide again**.
 
-Use `npm start` for a normal source launch or `npm run dev` for automatic reload. In VS Code, press **F5** and select **Electron: Development** after installing dependencies. Use `npm.cmd` in PowerShell if its execution policy blocks `npm`. See [Contributing](CONTRIBUTING.md#develop-locally) for debugging. Build local installers using the commands in [Desktop releases](docs/RELEASES.md).
+Use `npm start` for a normal source launch or `npm run dev` for automatic reload. In VS Code, press **F5** and select **Electron: Development** after installing dependencies. Use `npm.cmd` in PowerShell if its execution policy blocks `npm`. See [Contributing](CONTRIBUTING.md#develop-locally) for debugging. Build local installers using the commands in [Desktop releases](README.md#build-and-release).
 
 Just exploring? Open the [sample preview](docs/preview.html) locally. It uses sample data and never connects to your account.
 
@@ -76,9 +76,30 @@ Closing pauses downloads, including when the app stays in the tray. Verification
 
 - Season filenames follow the majority separator style once all queued files for that season complete. Extensions and tags such as WEB-DL stay intact. Ties keep original names; paused/failed files delay naming, and collisions offer a retry. Unverified files keep original names in their own folder.
 - Remembered sign-in suggestions can refill connection details after logout. **Forget suggestions** removes them.
-- Once releases begin, installed apps check at startup and daily and download updates automatically. **Restart now** installs when work is idle; **Not now** defers installation until the next launch after verification, which requires connectivity. Development mode does not install updates.
+- Once releases begin, installed Windows apps check at startup and daily and download updates automatically. **Restart now** installs when work is idle; **Not now** defers installation until the next launch after verification, which requires connectivity. Development mode does not install updates.
 
 </details>
+
+## Build and release
+
+Run `npm ci`, then `npm run pack:win` on Windows or `npm run pack:mac` on a Mac. Installers appear in `release/`. Mac builds are universal (Intel and Apple Silicon). These commands do not publish.
+
+Builds are unsigned. Windows may show security warnings; macOS may require approval in Privacy & Security before opening the app.
+
+**Windows updates:** the installed app checks GitHub at startup, daily and from Settings, downloads newer versions, then offers **Restart and install**. The installer opens automatically and upgrades the existing app. No manual GitHub download or uninstall is needed. **Not now** keeps the update for installation on a later launch after verification. Active work blocks installation. Settings, login, history and downloaded media are preserved.
+
+**macOS updates:** Settings opens GitHub Releases. Download the new DMG, quit the app and replace Season Shelf in Applications. App data is stored separately and retained. Automatic installation is disabled for unsigned Mac builds.
+
+**Publish:** merge the version change into `master` with passing CI, set repository Actions variable `RELEASES_ENABLED=true`, then push a matching tag such as `v1.0.0`. The workflow builds Windows EXE and Mac DMG/ZIP, uploads to a draft, and publishes only after both platforms succeed and required assets exist. No signing secrets are needed. Keep the generated blockmaps and update metadata with the installers. Never overwrite a published version; increment the package and lockfile version for every release.
+
+For the first release, after merging and pulling master:
+
+```sh
+git tag -a v1.0.0 -m "Season Shelf 1.0.0"
+git push origin v1.0.0
+```
+
+Local installer and real version-to-version update acceptance are separate from automated tests. Use a disposable OS account or VM for fresh-install testing.
 
 ## Know the limits
 
@@ -100,7 +121,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The app uses Electron, plain Java
 | `src/ui/` | Interface and interactions |
 | `test/` | Regression tests |
 
-[Contribution and development guide](CONTRIBUTING.md) · [Release setup](docs/RELEASES.md)
+[Contribution and development guide](CONTRIBUTING.md) · [Release setup](README.md#build-and-release)
 
 ## License and acknowledgements
 

@@ -1,6 +1,14 @@
 const {autoUpdater}=require('electron-updater');
 const {acceptsUpdate}=require('./environment.cjs');
-exports.installUpdates=({app,runtime={environment:'production',channel:'latest'},handle,notify,settings,saveSettings,busy,beforeInstall})=>{
+exports.installUpdates=({app,runtime={environment:'production',channel:'latest'},handle,notify,settings,saveSettings,busy,beforeInstall,platform=process.platform,openReleases})=>{
+  if(platform !== 'win32') {
+    const status={state:app.isPackaged?'manual':'development',version:app.getVersion()};
+    handle('update-status',()=>status);
+    handle('update-check',async()=>{if(app.isPackaged) await openReleases();return status;});
+    for(const name of ['update-download','update-install','update-later']) handle(name,async()=>{throw new Error('Install macOS updates from GitHub Releases.');});
+    handle('update-preference',()=>settings());
+    return ()=>{};
+  }
   let status={state:app.isPackaged?'idle':'development',version:app.getVersion()};
   let checking=false, installing=false;
   const deferredAtLaunch=settings().deferredUpdate;

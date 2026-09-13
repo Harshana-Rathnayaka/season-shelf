@@ -6,4 +6,4 @@ Edit or disable the keyword list in **Settings > Channel filtering**. Matching i
 
 Broad words can hide legitimate titles. Remove a matching term in Settings or use All channels if this happens. The built-in list is defined in `src/core/catalog.mjs`; user preferences can differ from the defaults.
 
-Per-channel always-show overrides, an affected-channel preview and explanations of individual matches are future candidates in the [roadmap](ROADMAP.md). The [old keyword proposal](archive/CHANNEL_FILTER_REVIEW.md) is historical research, not a request to enable those terms. This documentation cleanup does not change filtering behaviour.
+Per-channel always-show overrides, an affected-channel preview and explanations of individual matches are future candidates in the [roadmap](ROADMAP.md). Only configured keywords affect filtering; roadmap proposals are not enabled defaults.

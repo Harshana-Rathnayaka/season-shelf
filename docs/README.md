@@ -17,4 +17,4 @@ Start with the guide that matches what you want to do.
 
 [Contributing](../CONTRIBUTING.md) covers changes and PR expectations. [Current handoff](NEXT_SESSION.md) is a short maintainer continuity note, not the roadmap.
 
-The [sample preview](preview.html) runs locally with illustrative data. [Assets](assets/) contains the README banner and screenshot. The [archive](archive/README.md) preserves historical research proposals and session records; it is not current product documentation.
+The [sample preview](preview.html) runs locally with illustrative data. [Assets](assets/) contains the README banner and screenshot. Superseded notes are removed; Git history retains earlier records.

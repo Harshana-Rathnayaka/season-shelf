@@ -18,4 +18,4 @@ Baseline after PR #3 (13 September 2026):
 - Verify narrow layouts, enlarged text, custom themes, keyboard focus and dialogs on both platforms.
 - Validate signed install and update on Windows and macOS, including a deferred update and preserved data.
 
-See [development](DEVELOPMENT.md) for routine commands. Add new evidence with its environment and limitations rather than claiming all checks are equivalent. Older records are retained in [the validation archive](archive/VALIDATION.md).
+See [development](DEVELOPMENT.md) for routine commands. Add new evidence with its environment and limitations rather than claiming all checks are equivalent. Keep this summary current; earlier evidence remains in Git history.

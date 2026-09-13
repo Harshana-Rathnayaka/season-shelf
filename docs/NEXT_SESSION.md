@@ -14,4 +14,4 @@ Current baseline: PRs #1, #2 and #3 are merged into `master`. Windows/macOS rele
 
 The latest baseline has 104 passing tests on Windows and macOS CI. Native signed installation/update acceptance remains pending; see [validation](VALIDATION.md).
 
-Historical conversation checkpoints are in [the archived handoff](archive/NEXT_SESSION.md). They contain superseded approaches and must not override current source or guides.
+Keep this handoff current. Git history preserves earlier development records.

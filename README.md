@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/status-in_development-A0E4C6?style=flat-square" alt="In development">
 </p>
 
-<p align="center"><a href="#get-started">Get started</a> &middot; <a href="docs/README.md">Documentation</a> &middot; <a href="docs/ROADMAP.md">Roadmap</a> &middot; <a href="CONTRIBUTING.md">Contribute</a></p>
+<p align="center"><a href="#get-started">Get started</a> &middot; <a href="docs/RELEASES.md">Release setup</a> &middot; <a href="docs/ROADMAP.md">Roadmap</a> &middot; <a href="CONTRIBUTING.md">Contribute</a></p>
 
 **Download episodes from Telegram and organise them into season folders.** Choose a series, pick your quality and manage your collection from one desktop app.
 
@@ -53,7 +53,13 @@ npm ci
 npm run dev
 ```
 
-Follow the welcome guide to connect Telegram, choose a channel and download your first episode. See [Getting started](docs/GETTING_STARTED.md) for account setup and troubleshooting.
+1. Follow the welcome guide and connect using your own Telegram API ID, API hash and phone number. Obtain API credentials from [Telegram](https://my.telegram.org).
+2. Choose a channel or a supported bot result, then set the show's **Download folder** and optional **Watch folder**.
+3. Select a quality and episodes in **Verified**, or manually choose **Unverified** files. Track downloads and open completed files in **Saved files**.
+
+Missing a channel? Select **All channels** or adjust **Settings > Channel filtering**. No verified results? Check other available qualities and Unverified. Replay onboarding from **Settings > About > Watch guide again**.
+
+Use `npm start` for a normal launch (`npm.cmd start` in PowerShell). Windows also provides `Setup.cmd`, `Dev.cmd` and `Start.cmd`.
 
 Just exploring? Open the [sample preview](docs/preview.html) locally. It uses sample data and never connects to your account.
 
@@ -61,9 +67,18 @@ Just exploring? Open the [sample preview](docs/preview.html) locally. It uses sa
 
 Sessions and remembered sign-in details are encrypted using operating-system storage. Passwords and verification codes are not saved. Development and installed apps use separate profiles.
 
-**Clear app data keeps downloaded files on disk.** Deleting media is a separate confirmed action. Closing the window pauses downloads, including when the app stays in the tray.
+**Clear app data keeps downloaded files and partials on disk.** It clears download/history records, the selected series, watches and lifetime totals; login, preferences and onboarding remain. **Reset lifetime totals** clears only counters. Delete media separately in Saved files, or use File Explorer/Finder after clearing its history.
 
-Read the [user guide](docs/USER_GUIDE.md) for file naming, reset controls and updates.
+Closing pauses downloads, including when the app stays in the tray. Verification and transfers finish safely; resume from the tray or Downloads. Interrupted jobs return paused after restart.
+
+<details>
+<summary>Filename rules, sign-in suggestions and updates</summary>
+
+- Season filenames follow the majority separator style once all queued files for that season complete. Extensions and tags such as WEB-DL stay intact. Ties keep original names; paused/failed files delay naming, and collisions offer a retry. Unverified files keep original names in their own folder.
+- Remembered sign-in suggestions can refill connection details after logout. **Forget suggestions** removes them.
+- Once releases begin, installed apps check at startup and daily and download updates automatically. **Restart now** installs when work is idle; **Not now** defers installation until the next launch after verification, which requires connectivity. Development mode does not install updates.
+
+</details>
 
 ## Know the limits
 
@@ -85,7 +100,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The app uses Electron, plain Java
 | `src/ui/` | Interface and interactions |
 | `test/` | Regression tests |
 
-[Development guide](docs/DEVELOPMENT.md) · [Branch and PR policy](docs/PROJECT_WORKFLOW.md) · [Release setup](docs/RELEASES.md)
+[Contribution and development guide](CONTRIBUTING.md) · [Release setup](docs/RELEASES.md)
 
 ## License and acknowledgements
 

@@ -46,7 +46,7 @@ See [electron-builder v26 Windows signing documentation](https://www.electron.bu
 
 The pinned electron-updater 6.x implementation rechecks releases on startup and verifies the cached download before a deferred install. It does not use the newer 7.x `autoInstallEvent` API. This currently needs network access on the next launch. Development builds do not check/install real updates.
 
-See [the full branch, PR and release policy](PROJECT_WORKFLOW.md). Normal CI never packages an installer. No extra artifact-building workflow is needed: the release job already does that before publishing.
+See [contribution and PR policy](../CONTRIBUTING.md). Normal CI never packages an installer. No extra artifact-building workflow is needed: the release job already does that before publishing.
 
 ## macOS release setup
 

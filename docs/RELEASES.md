@@ -1,4 +1,4 @@
-# Windows releases
+# Desktop releases
 
 The updater is configured for public GitHub Releases at https://github.com/Harshana-Rathnayaka/season-shelf. No release has been published by this development task.
 
@@ -12,9 +12,9 @@ If packaging in a restricted environment, set `ELECTRON_BUILDER_CACHE` to a writ
 
 1. Finish the changes and increment the version in package.json and package-lock.json, for example with `npm.cmd version patch --no-git-tag-version`.
 2. Commit the release version and changes. Merge the intended release into `master` first, after CI passes.
-3. Configure Windows signing and deliberately set the repository variable `RELEASES_ENABLED=true` when ready. Until then the tag workflow skips release jobs.
-4. Create and push a matching stable version tag, for example `v0.1.1`, on a commit already merged into `master`. The one release workflow validates ancestry/version, runs checks, builds signed artifacts and uploads them to GitHub Releases. Unsigned release builds fail.
-5. Confirm the release is public and contains the `.exe`, `.exe.blockmap` and `latest.yml`. Preserve all three files from the same build. A private repository needs a separate public release repository or a different distribution design; do not embed a GitHub access token in the desktop app.
+3. Configure Windows signing and macOS signing/notarization (below), then deliberately set `RELEASES_ENABLED=true` when ready. Until then the tag workflow skips release jobs.
+4. Push a matching stable version tag on a commit already merged into `master`. The workflow validates ancestry/version, tests Windows and macOS, and uploads signed builds to a draft. Only after both jobs succeed and the expected assets exist does it publish the release. Failures leave the draft unpublished; already published versions cannot be overwritten.
+5. Confirm the release contains the Windows `.exe`, its `.blockmap` and `latest.yml`, plus the macOS universal `.dmg`, `.zip`, generated blockmaps and `latest-mac.yml`. Preserve these files from the same release. Do not embed a GitHub access token in the desktop app.
 
 Alternatively, a maintainer can run `npm.cmd run release:win` in an environment with an appropriately scoped `GH_TOKEN`. Do not put that token in a source file, client setting or committed environment file.
 
@@ -47,3 +47,28 @@ See [electron-builder v26 Windows signing documentation](https://www.electron.bu
 The pinned electron-updater 6.x implementation rechecks releases on startup and verifies the cached download before a deferred install. It does not use the newer 7.x `autoInstallEvent` API. This currently needs network access on the next launch. Development builds do not check/install real updates.
 
 See [the full branch, PR and release policy](PROJECT_WORKFLOW.md). Normal CI never packages an installer. No extra artifact-building workflow is needed: the release job already does that before publishing.
+
+## macOS release setup
+
+The macOS runner builds one universal application for Intel and Apple Silicon. It produces `Season-Shelf-<version>-mac-universal.dmg` for installation and the corresponding ZIP for automatic updates. A universal build avoids separate architecture jobs overwriting `latest-mac.yml`.
+
+Configure these repository Actions secrets before enabling releases:
+
+| Secret | Purpose |
+| --- | --- |
+| CSC_LINK / CSC_KEY_PASSWORD | Existing Windows certificate and password |
+| MAC_CSC_LINK | Base64-encoded Developer ID Application certificate (.p12), including its private key |
+| MAC_CSC_KEY_PASSWORD | Password for that exported certificate |
+| APPLE_ID | Apple Developer account email |
+| APPLE_APP_SPECIFIC_PASSWORD | App-specific password for notarization |
+| APPLE_TEAM_ID | Apple Developer team ID |
+
+The workflow requires credentials, enables hardened runtime and JIT entitlements, forces signing, notarizes through electron-builder, and verifies the stapled ticket. Credentials and certificates are not configured by this PR. Keep them in Actions secrets.
+
+On a Mac, `npm run pack:mac` builds without publishing; `npm run release:mac` publishes with configured credentials. Prefer the tag workflow for public releases because it coordinates both platforms. For deliberate unsigned local packaging only, use `npm run pack:mac -- --config.mac.identity=null --config.mac.notarize=false --config.mac.hardenedRuntime=false`. This cannot validate the signed update path.
+
+Install by opening the DMG and dragging Season Shelf to Applications. Installed macOS data lives under `~/Library/Application Support/Season Shelf/installed`; updates preserve it. DMG and ZIP are both required for macOS automatic updates. The artifact names include the platform to avoid Windows collisions.
+
+No release gate was enabled, tag pushed or installer built by this change. Native signed install/update acceptance on a Mac is still required before the first public release.
+
+References: [electron-builder v26 macOS configuration](https://www.electron.build/v26/docs/mac/), [publishing](https://www.electron.build/v26/docs/publish/) and [notarization integration](https://github.com/electron/notarize).

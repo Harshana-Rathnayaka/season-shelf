@@ -34,3 +34,20 @@ test("development reloads despite active work and requests one normal restart", 
   onChange("change","core/queue.mjs"); apply();
   assert.equal(restarts,1); assert.equal(quits,1);
 });
+
+test('a rejected second instance cannot initialize storage or create a window while quit is pending',async()=>{
+  let quits=0;let ready=0;let windows=0;
+  const app={isPackaged:false,setName(){},setAppUserModelId(){},requestSingleInstanceLock:()=>false,quit:()=>quits++,whenReady(){ready++;throw Error('Startup must stop');},on(){throw Error('Startup handlers must not register');}};
+  const sandbox={__dirname:path.resolve('src/desktop'),process:{argv:[]},require(name){
+    if(name==='electron')return {app,BrowserWindow:class{constructor(){windows++;}}};
+    if(name==='node:path')return path;
+    if(name==='node:url')return {pathToFileURL:()=>({href:'file:///test'})};
+    if(name==='./environment.cjs')return {resolveEnvironment:()=>({environment:'development',name:'Season Shelf Dev',appId:'test'})};
+    if(name==='./profile.cjs')return {configureProfile(){}};
+    if(['node:fs/promises','node:crypto','../../package.json'].includes(name))return {};
+    throw Error(name);
+  }};
+  const source=await fs.readFile('src/desktop/main.cjs','utf8');
+  vm.runInNewContext(`(function(){${source}\n})()`,sandbox);
+  assert.equal(quits,1);assert.equal(ready,0);assert.equal(windows,0);
+});

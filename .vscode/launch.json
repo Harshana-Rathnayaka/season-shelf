@@ -5,9 +5,9 @@
       "name": "Electron: Development",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/electron/dist/electron",
       "windows": {
-        "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
+        "runtimeExecutable": "${workspaceFolder}/node_modules/electron/dist/electron.exe"
       },
       "args": [
         ".",
@@ -21,7 +21,10 @@
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "autoAttachChildProcesses": true
+      "autoAttachChildProcesses": false,
+      "osx": {
+        "runtimeExecutable": "${workspaceFolder}/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron"
+      }
     }
   ]
 }

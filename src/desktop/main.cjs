@@ -29,7 +29,12 @@ const runtime = require("./environment.cjs").resolveEnvironment({isPackaged:app.
 require("./profile.cjs").configureProfile(app, runtime.environment);
 app.setName(runtime.name);
 app.setAppUserModelId(runtime.appId);
-if (!app.requestSingleInstanceLock()) app.quit();
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  // quit is asynchronous (especially with a debugger attached). Do not start
+  // storage, Chromium or a second window while this process is exiting.
+  return;
+}
 app.on("second-instance", () => {
   win?.show();
   win?.focus();

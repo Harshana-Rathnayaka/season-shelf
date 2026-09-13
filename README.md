@@ -72,7 +72,7 @@ Read the [user guide](docs/USER_GUIDE.md) for file naming, reset controls and up
 - Watches need the app running; downloads cannot continue while the computer sleeps.
 - Alternate-bot 1080p retrieval and WhatsApp notifications are not implemented.
 
-See the [roadmap](docs/ROADMAP.md) for next steps and [validation status](docs/VALIDATION.md) for what has actually been checked.
+See the [roadmap](docs/ROADMAP.md) for next steps and remaining release prerequisites.
 
 ## 🤝 Contribute
 

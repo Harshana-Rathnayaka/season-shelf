@@ -32,4 +32,4 @@ node scripts/build-preview.mjs
 
 Use `npm.cmd` instead of `npm` in PowerShell. Regenerate the standalone preview when UI source changes; documentation-only changes do not require rebuilding it. Normal CI runs syntax checks and tests on Windows and macOS without packaging installers.
 
-The development watcher has offline tests for UI reload during downloads and delayed backend restart. See [validation status](VALIDATION.md) for native acceptance limits and [contributing](../CONTRIBUTING.md) for PR expectations.
+The development watcher has offline tests for UI reload during downloads and delayed backend restart. Mock and DOM tests do not replace live Telegram or signed install/update checks. See [contributing](../CONTRIBUTING.md) for PR expectations.

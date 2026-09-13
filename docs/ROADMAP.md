@@ -22,6 +22,5 @@ This is a prioritised direction, not a release schedule. Features listed below a
 
 ## Maintainability
 
-Extract larger renderer pages and IPC handlers incrementally while preserving existing integrity and security boundaries. See [architecture review](ARCHITECTURE_REVIEW.md). Add regression coverage for real failures rather than splitting files solely to meet a size target.
+Extract larger renderer pages and IPC handlers incrementally while preserving existing integrity and security boundaries. Add regression coverage for real failures rather than splitting files solely to meet a size target.
 
-Already implemented: manual Unverified selection, app-history missing-episode checks, supported subscription joining/retry, hourly watches, scheduling and speed limits, tray operation, onboarding, metadata-only resets and installer/updater configuration. The [README](../README.md) describes current capabilities; [validation](VALIDATION.md) separates implementation from acceptance evidence.

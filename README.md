@@ -1,102 +1,109 @@
-<p align="center"><img src="docs/assets/readme-banner.svg" alt="Season Shelf — Your series, beautifully organised" width="100%"></p>
+﻿<p align="center"><img src="docs/assets/readme-banner.svg" alt="Season Shelf — Your series, beautifully organised" width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml"><img src="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-357EC7?style=flat-square" alt="Windows and macOS build targets">
+  <a href="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml"><img src="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml/badge.svg" alt="Windows and macOS CI"></a>
+  <img src="https://img.shields.io/badge/build_targets-Windows%20%7C%20macOS-357EC7?style=flat-square" alt="Windows and macOS build targets">
   <img src="https://img.shields.io/badge/status-in_development-A0E4C6?style=flat-square" alt="In development">
 </p>
-<p align="center"><a href="#get-started">Get started</a> ? <a href="CONTRIBUTING.md">Contribute</a> ? <a href="docs/PROJECT_WORKFLOW.md">Branches &amp; releases</a> ? <a href="docs/NEXT_SESSION.md">Roadmap</a></p>
 
-> **A calmer way to build your collection.** Choose episodes in Telegram channels. Keep the files in folders you control.
+<p align="center"><a href="#get-started">Get started</a> &middot; <a href="docs/RELEASES.md">Release setup</a> &middot; <a href="docs/ROADMAP.md">Roadmap</a> &middot; <a href="CONTRIBUTING.md">Contribute</a></p>
 
+**Download episodes from Telegram and organise them into season folders.** Choose a series, pick your quality and manage your collection from one desktop app.
 
-![Season Shelf series library, using illustrative sample data](docs/assets/library-preview.png)
+![Season Shelf series library with illustrative sample data](docs/assets/library-preview.png)
 
-## From channel to collection
+## 📺 Your collection, organised
 
-Choose a series channel, pick a quality, and select your episodes. Season Shelf handles the queue, checks the downloaded bytes and saves them into season folders.
-
-| Feature | What it does |
+| Feature | What you can do |
 | --- | --- |
-| Channel discovery | Browse joined channels or follow supported MovieClubFamily bot results and subscription steps. |
-| Quality selection | Shows formats found in the channel. Archive defaults to 720p HEVC; Watch prefers 1080p. |
-| Verified / Unverified | Keep recognised episode metadata separate from files you choose manually. |
-| Resumable downloads | Pause, resume, cancel or remove individual files or the queue. |
-| Season filenames | Keep original names; after queued season files finish, match minority separators to the season's majority style. Supports dots, underscores, dashes and spaces. |
-| Collection tools | Find missing episodes in app-managed history, review saved files and move selected media to the Recycle Bin. |
-| Series watches | Check new uploads hourly while running. Notify or queue automatically when enabled. |
-| Transfer controls | Set download hours, a shared speed limit and simultaneous downloads. |
-| Personal workspace | Customise theme, colours, font size and weight. Collapse the sidebar and keep controls visible while lists scroll. |
+| Discover series | Browse joined channels or follow supported bot search results. |
+| Choose your files | Filter by quality and codec, or manually select Unverified files. |
+| Control downloads | Pause, resume, schedule download hours and limit bandwidth. |
+| Keep folders tidy | Save episodes by season and normalise filename separators. |
+| Track your collection | Find missing episodes against app-managed history and manage saved files. |
+| Follow new episodes | Check hourly while the app runs; notify or queue new uploads. |
+| Make it yours | Adjust theme, accent colour, font size and weight. |
 
-## Get started
+Download and Watch folders keep permanent and viewing copies separate. You decide when to delete files.
 
-**Development builds only for now.** No production release is being published yet.
+<a id="get-started"></a>
 
-On Windows, with Node.js 24 or later installed:
+## 🚀 Get started
+
+> **In development:** production installers are not published yet. Windows and macOS build workflows are configured; signed installation and update acceptance are still pending.
+
+Install Node.js 24 or later and Git, then clone the project:
+
+```sh
+git clone https://github.com/Harshana-Rathnayaka/season-shelf.git
+cd season-shelf
+```
+
+**Windows · PowerShell**
 
 ```powershell
 npm.cmd ci
 npm.cmd run dev
 ```
 
-Development mode reloads UI changes and restarts backend changes when current work is idle. You do not need to rebuild an installer for each edit. `Start.cmd` launches normally; `Dev.cmd` starts development mode.
+**macOS · Terminal**
 
-1. Follow the welcome guide and connect your Telegram account using your own API ID, API hash and phone number.
-2. Choose a series channel, or use the supported bot discovery flow.
-3. Choose the show's **Download folder**, such as `D:\Shows\12 Monkeys`. Episodes go into `Season 01` inside it. The optional **Watch folder** is separate.
-4. Select files and download. Track the current batch in Downloads.
-
-Replay onboarding any time from **Settings → About → Watch guide again**. Its completion is remembered in both development and installed profiles.
-
-Want to explore without connecting Telegram? Open [the sample preview](docs/preview.html) locally. It uses sample data and does not download or access your account.
-
-## Your data stays on your computer
-
-- Telegram sessions and remembered sign-in details are encrypted using operating-system storage. Passwords and verification codes are not saved.
-- After logout, a remembered-account suggestion can fill all three connection fields. Use **Forget suggestions** to remove it.
-- Development and installed apps have separate profiles. Installed updates preserve their profile.
-- **Clear app data** removes queue/history, saved-file records, the selected series, series watches and lifetime totals. Media and partial files stay on disk; account, preferences and onboarding completion remain.
-- **Reset lifetime totals** clears only activity counters. It does not change queue progress or history.
-- Deleting media is a separate, confirmed action in **Saved files**. After clearing history, manage previously downloaded files in File Explorer.
-
-Closing the window pauses downloads, including when **Keep in system tray** is selected. File verification and transfer operations finish safely. Resume from the tray or Downloads.
-
-## File handling
-
-Files are staged locally, checked, and published without replacing a different existing file. Interrupted work returns paused after a restart.
-
-Filename normalization uses completed, app-managed files from the same season and destination. It preserves extensions and recognised tags such as `WEB-DL`. Tied styles remain unchanged. Failed or paused season entries delay normalization; filename collisions retain the original and offer a retry in File details. Unverified files keep original names in an `Unverified` folder.
-
-## Updates, when releases begin
-
-Release publishing is disabled until the maintainer enables `RELEASES_ENABLED` and configures signing. The updater targets this repository's GitHub Releases. Installed builds check at startup and daily, download available updates, then offer **Restart now** or **Not now**. Deferred updates install on the next launch after release and download verification; that check requires connectivity. Active work must finish before installation.
-
-Development mode does not install updates. Packaging is intentionally separate from everyday development. See [release and signing instructions](docs/RELEASES.md).
-
-## Development checks
-
-```powershell
-npm.cmd run check
-npm.cmd test
-node scripts/build-preview.mjs
+```sh
+npm ci
+npm run dev
 ```
 
-The tests cover download integrity and recovery, discovery, parsing, naming, settings, update decisions and UI interactions. Isolated Electron screenshots are used for layout checks; they do not validate live Telegram transfers.
+1. Follow the welcome guide and connect using your own Telegram API ID, API hash and phone number. Obtain API credentials from [Telegram](https://my.telegram.org).
+2. Choose a channel or a supported bot result, then set the show's **Download folder** and optional **Watch folder**.
+3. Select a quality and episodes in **Verified**, or manually choose **Unverified** files. Track downloads and open completed files in **Saved files**.
 
-| Area | Location |
+Missing a channel? Select **All channels** or adjust **Settings > Channel filtering**. No verified results? Check other available qualities and Unverified. Replay onboarding from **Settings > About > Watch guide again**.
+
+Use `npm start` for a normal launch (`npm.cmd start` in PowerShell). Windows also provides `Setup.cmd`, `Dev.cmd` and `Start.cmd`.
+
+Just exploring? Open the [sample preview](docs/preview.html) locally. It uses sample data and never connects to your account.
+
+## 🔒 Your files and data
+
+Sessions and remembered sign-in details are encrypted using operating-system storage. Passwords and verification codes are not saved. Development and installed apps use separate profiles.
+
+**Clear app data keeps downloaded files and partials on disk.** It clears download/history records, the selected series, watches and lifetime totals; login, preferences and onboarding remain. **Reset lifetime totals** clears only counters. Delete media separately in Saved files, or use File Explorer/Finder after clearing its history.
+
+Closing pauses downloads, including when the app stays in the tray. Verification and transfers finish safely; resume from the tray or Downloads. Interrupted jobs return paused after restart.
+
+<details>
+<summary>Filename rules, sign-in suggestions and updates</summary>
+
+- Season filenames follow the majority separator style once all queued files for that season complete. Extensions and tags such as WEB-DL stay intact. Ties keep original names; paused/failed files delay naming, and collisions offer a retry. Unverified files keep original names in their own folder.
+- Remembered sign-in suggestions can refill connection details after logout. **Forget suggestions** removes them.
+- Once releases begin, installed apps check at startup and daily and download updates automatically. **Restart now** installs when work is idle; **Not now** defers installation until the next launch after verification, which requires connectivity. Development mode does not install updates.
+
+</details>
+
+## Know the limits
+
+- Bot automation supports specific Telegram flows. Some attachment links, separate callback replies and approval-only subscriptions still need Telegram.
+- Missing-episode checks use app-managed history, not arbitrary folders on disk.
+- Watches need the app running; downloads cannot continue while the computer sleeps.
+- Alternate-bot 1080p retrieval and WhatsApp notifications are not implemented.
+
+See the [roadmap](docs/ROADMAP.md) for next steps and remaining release prerequisites.
+
+## 🤝 Contribute
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). The app uses Electron, plain JavaScript and SQLite:
+
+| Location | Responsibility |
 | --- | --- |
-| Queue, parsing, file integrity and persistence | `src/core/` |
-| Electron, Telegram, secure storage and IPC | `src/desktop/` |
-| Interface, appearance and interaction | `src/ui/` |
-| Regression tests | `test/` |
-| Development notes and research | `docs/` |
+| `src/core/` | Queue, parsing, persistence and file integrity |
+| `src/desktop/` | Electron, Telegram, secure storage and IPC |
+| `src/ui/` | Interface and interactions |
+| `test/` | Regression tests |
 
-## Current boundaries
-
-Bot discovery is specific to supported Telegram flows. Some attachment links, callbacks that send separate messages, and approval-only subscriptions still need Telegram. Alternate-bot 1080p retrieval and WhatsApp completion messages are not implemented. Missing-episode checks compare app-managed history, not arbitrary files elsewhere on disk. Watches need the app running; downloads cannot continue while the PC sleeps or is shut down.
-
-See [the current handoff](docs/NEXT_SESSION.md) for remaining work and [the architecture review](docs/ARCHITECTURE_REVIEW.md) for design decisions.
+[Contribution and development guide](CONTRIBUTING.md) · [Release setup](docs/RELEASES.md)
 
 ## License and acknowledgements
 
-A project license has not been selected yet. Third-party dependencies retain their own licenses, viewable from **Settings → About → Third-party licenses**. Built with Electron, Teleproto, electron-updater and SQLite. Season Shelf is an independent client, not affiliated with Telegram.
+A source-code license has not been selected yet. Third-party dependencies retain their own licenses, available in **Settings > About > Third-party licenses**.
+
+Built with Electron, Teleproto, electron-updater and SQLite. Season Shelf is independent and is not affiliated with Telegram.

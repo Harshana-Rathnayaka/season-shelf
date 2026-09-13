@@ -24,6 +24,12 @@ Use `feat/`, `fix/`, `docs/`, `refactor/` or `chore/` plus a short kebab-case de
 
 Commit titles describe the result: `fix(ui): keep library controls stable for empty channels`. Use `feat`, `fix`, `docs`, `refactor`, `test`, `chore` or `ci`. Avoid generic titles such as “updates” or “final fixes”.
 
+## Develop locally
+
+Use the [README setup instructions](README.md#get-started). Use `npm` on macOS and `npm.cmd` in Windows PowerShell. Close a normally launched instance before switching to development mode.
+
+UI edits reload the renderer; backend edits restart Electron once active work is idle. Unsaved UI state may reset. Restarts restore unfinished jobs paused. The Development menu provides DevTools and Restart when idle. DevTools edits are temporary unless saved to source.
+
 ## Make a reviewable change
 
 - Keep parsing/queue/file rules in `src/core`, privileged services in `src/desktop`, and presentation in `src/ui`.
@@ -39,13 +45,19 @@ npm.cmd test
 node scripts/build-preview.mjs
 ```
 
-Preview output is committed when the UI changes. Installer builds are not part of the ordinary development loop. Explain any live Telegram or Windows-only verification you could not perform.
+Preview output is committed when the UI changes. Installer builds are not part of the ordinary development loop. Explain any live Telegram or platform-specific verification you could not perform.
 
 ## Open the PR
 
 Target `master` for independent work. Use the PR template: problem, resulting behaviour, validation and material limitations. Include a screenshot for UI changes. Apply one change-type label and relevant area labels. Keep work-in-progress PRs as drafts; do not use labels to duplicate draft/review status.
 
-Prefer squash merging independent short-lived PRs with a descriptive final title. Delete merged branches. A stack needs special care after a parent is squash-merged; see [the project workflow](docs/PROJECT_WORKFLOW.md) before rebasing or force-pushing.
+Prefer squash merging independent short-lived PRs with a descriptive final title. Delete merged branches. For dependent PRs, merge the parent first, then retarget the child to master. A parent merge commit preserves ancestry; a squash merge changes commit IDs and can show duplicate changes. On an exclusively owned child branch, save the old parent tip and use `git rebase --onto origin/master <old-parent-tip> <child-branch>` followed by `git push --force-with-lease`. Coordinate with collaborators; a fresh branch with only child commits cherry-picked avoids rewriting a shared branch.
+
+## Labels and repository settings
+
+Label definitions live in [.github/labels.json](.github/labels.json); the sync workflow creates/updates them. Pick one change type (bug, enhancement, documentation or maintenance) and relevant area labels. Use priority: high sparingly, blocked with an explanation, and contributor labels only for scoped work. GitHub already tracks draft/review/merged status.
+
+Recommended master protections: require PRs, passing Windows checks and macOS checks, and resolved conversations; block force pushes and branch deletion. For a solo maintainer, avoid requiring self-approval. Add independent review when another maintainer is available.
 
 ## Releases
 

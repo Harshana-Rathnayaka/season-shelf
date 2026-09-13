@@ -1,6 +1,6 @@
 # Desktop releases
 
-The updater is configured for public GitHub Releases at https://github.com/Harshana-Rathnayaka/season-shelf. No release has been published by this development task.
+The updater is configured for public GitHub Releases at https://github.com/Harshana-Rathnayaka/season-shelf.
 
 ## Build locally
 
@@ -26,7 +26,7 @@ Signing is not configured. Before broad public distribution, configure a publish
 
 Publishing and a real installed-version upgrade have not been performed. The first public release is the remaining external step that makes update delivery available to users.
 
-### Profile separation (12 September)
+### Profile separation
 Installed builds store their encrypted session, SQLite history and staging under `%APPDATA%/Season Shelf/installed`. Development keeps its original Electron profile. Never copy a developer profile into a release. Updates keep the installed profile and onboarding completion flag. Existing files on disk are not moved by this change.
 
 ## Signing before a public release
@@ -40,13 +40,13 @@ Before publishing:
 3. Keep signing credentials in protected CI secrets or the provider's key service, never in the repository.
 4. Build a signed release, verify its Authenticode signature and test installation/update behaviour before publishing.
 
-See [electron-builder v26 Windows signing documentation](https://www.electron.build/v26/docs/features/code-signing/code-signing-win/). Signing is not configured or purchased in this task, and no release is published.
+See [electron-builder v26 Windows signing documentation](https://www.electron.build/v26/docs/features/code-signing/code-signing-win/).
 
 ### Deferred updates
 
 The pinned electron-updater 6.x implementation rechecks releases on startup and verifies the cached download before a deferred install. It does not use the newer 7.x `autoInstallEvent` API. This currently needs network access on the next launch. Development builds do not check/install real updates.
 
-See [the full branch, PR and release policy](PROJECT_WORKFLOW.md). Normal CI never packages an installer. No extra artifact-building workflow is needed: the release job already does that before publishing.
+See [contribution and PR policy](../CONTRIBUTING.md). Normal CI never packages an installer. No extra artifact-building workflow is needed: the release job already does that before publishing.
 
 ## macOS release setup
 
@@ -63,12 +63,12 @@ Configure these repository Actions secrets before enabling releases:
 | APPLE_APP_SPECIFIC_PASSWORD | App-specific password for notarization |
 | APPLE_TEAM_ID | Apple Developer team ID |
 
-The workflow requires credentials, enables hardened runtime and JIT entitlements, forces signing, notarizes through electron-builder, and verifies the stapled ticket. Credentials and certificates are not configured by this PR. Keep them in Actions secrets.
+The workflow requires credentials, enables hardened runtime and JIT entitlements, forces signing, notarizes through electron-builder, and verifies the stapled ticket. Keep credentials and certificates in Actions secrets.
 
 On a Mac, `npm run pack:mac` builds without publishing; `npm run release:mac` publishes with configured credentials. Prefer the tag workflow for public releases because it coordinates both platforms. For deliberate unsigned local packaging only, use `npm run pack:mac -- --config.mac.identity=null --config.mac.notarize=false --config.mac.hardenedRuntime=false`. This cannot validate the signed update path.
 
 Install by opening the DMG and dragging Season Shelf to Applications. Installed macOS data lives under `~/Library/Application Support/Season Shelf/installed`; updates preserve it. DMG and ZIP are both required for macOS automatic updates. The artifact names include the platform to avoid Windows collisions.
 
-No release gate was enabled, tag pushed or installer built by this change. Native signed install/update acceptance on a Mac is still required before the first public release.
+Complete native signed install/update acceptance on a Mac before the first public release.
 
 References: [electron-builder v26 macOS configuration](https://www.electron.build/v26/docs/mac/), [publishing](https://www.electron.build/v26/docs/publish/) and [notarization integration](https://github.com/electron/notarize).

@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Electron: Development",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
+      "windows": {"runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"},
+      "args": [".", "--dev"],
+      "cwd": "${workspaceFolder}",
+      "env": {"ELECTRON_RUN_AS_NODE": null},
+      "outputCapture": "std",
+      "skipFiles": ["<node_internals>/**"],
+      "autoAttachChildProcesses": true
+    },
+    {
+      "name": "Electron: UAT preview",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
+      "windows": {"runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"},
+      "args": [".", "--environment=uat"],
+      "cwd": "${workspaceFolder}",
+      "env": {"ELECTRON_RUN_AS_NODE": null},
+      "outputCapture": "std",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Electron: Production preview",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
+      "windows": {"runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"},
+      "args": [".", "--environment=production"],
+      "cwd": "${workspaceFolder}",
+      "env": {"ELECTRON_RUN_AS_NODE": null},
+      "outputCapture": "std",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}

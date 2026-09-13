@@ -13,7 +13,7 @@ If packaging in a restricted environment, set `ELECTRON_BUILDER_CACHE` to a writ
 1. Finish the changes and increment the version in package.json and package-lock.json, for example with `npm.cmd version patch --no-git-tag-version`.
 2. Commit the release version and changes. Merge the intended release into `master` first, after CI passes.
 3. Configure Windows signing and macOS signing/notarization (below), then deliberately set `RELEASES_ENABLED=true` when ready. Until then the tag workflow skips release jobs.
-4. Push a matching stable version tag on a commit already merged into `master`. The workflow validates ancestry/version, tests Windows and macOS, and uploads signed builds to a draft. Only after both jobs succeed and the expected assets exist does it publish the release. Failures leave the draft unpublished; already published versions cannot be overwritten.
+4. Push a matching stable or UAT version tag on a commit already merged into `master`. The workflow validates ancestry/version, tests Windows and macOS, and uploads signed builds to a draft. Only after both jobs succeed and the expected assets exist does it publish the release. Failures leave the draft unpublished; already published versions cannot be overwritten.
 5. Confirm the release contains the Windows `.exe`, its `.blockmap` and `latest.yml`, plus the macOS universal `.dmg`, `.zip`, generated blockmaps and `latest-mac.yml`. Preserve these files from the same release. Do not embed a GitHub access token in the desktop app.
 
 Alternatively, a maintainer can run `npm.cmd run release:win` in an environment with an appropriately scoped `GH_TOKEN`. Do not put that token in a source file, client setting or committed environment file.
@@ -72,3 +72,20 @@ Install by opening the DMG and dragging Season Shelf to Applications. Installed 
 Complete native signed install/update acceptance on a Mac before the first public release.
 
 References: [electron-builder v26 macOS configuration](https://www.electron.build/v26/docs/mac/), [publishing](https://www.electron.build/v26/docs/publish/) and [notarization integration](https://github.com/electron/notarize).
+
+## UAT and production flavours
+
+Production keeps the existing app ID and installed profile. UAT builds use **Season Shelf UAT**, app ID `local.seasonshelf.desktop.uat` and the `uat` update channel. Production accepts only stable versions; UAT accepts only `X.Y.Z-uat.N` versions. Channel selection disables downgrades, and runtime checks reject cross-environment updates even if a provider returns an unexpected release.
+
+| Build | Windows | macOS |
+| --- | --- | --- |
+| Production | `npm run pack:win` | `npm run pack:mac` |
+| UAT | `npm run pack:uat:win` | `npm run pack:uat:mac` |
+
+Production output is in `release/`; UAT output is in `release/uat/`. A local UAT build from a stable package version gets a `-uat.0` suffix. For a published UAT version, update package.json and package-lock.json explicitly, for example `npm version 0.2.0-uat.1 --no-git-tag-version`, and merge the version commit before pushing `v0.2.0-uat.1`. Stable releases use matching `v0.2.0` tags. Do not publish local -uat.0 builds repeatedly under one version.
+
+The gated tag workflow chooses the correct build configuration. UAT publishes a GitHub prerelease, never marks it latest, and includes `uat.yml` and `uat-mac.yml`. Production publishes the stable release with `latest.yml` and `latest-mac.yml`. Both require signing, notarization and complete Windows/macOS assets. Keep the publishing gate disabled until signed install/update acceptance succeeds.
+
+Installed profiles live under the OS application-data directory: `Season Shelf/installed` for production and `Season Shelf UAT/installed` for UAT. Source UAT uses `Season Shelf UAT/development`; source production previews use `Season Shelf/production-preview`. Existing source-development storage stays in place. No sessions or history are copied between them.
+
+See [electron-builder update channels](https://www.electron.build/v26/docs/tutorials/release-using-channels/). Environment names are project configuration, not a special Electron flavour API.

@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { spawnSync } from "node:child_process";
-for (const folder of ["src", "scripts", "test"]) {
+for (const folder of ["src", "scripts", "test", "build"]) {
   for (const filename of await fs.readdir(folder, { recursive: true })) {
     if (!/\.(mjs|cjs)$/.test(filename)) continue;
     const result = spawnSync(

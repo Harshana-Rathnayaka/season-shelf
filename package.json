@@ -18,7 +18,13 @@
     "pack:win": "electron-builder --win nsis --x64 --publish never",
     "release:win": "electron-builder --win nsis --x64 --publish always",
     "pack:mac": "electron-builder --mac dmg zip --universal --publish never",
-    "release:mac": "electron-builder --mac dmg zip --universal --publish always"
+    "release:mac": "electron-builder --mac dmg zip --universal --publish always",
+    "start:uat": "electron . --environment=uat",
+    "start:prod": "electron . --environment=production",
+    "pack:uat:win": "electron-builder --config electron-builder.uat.cjs --win nsis --x64 --publish never",
+    "pack:uat:mac": "electron-builder --config electron-builder.uat.cjs --mac dmg zip --universal --publish never",
+    "release:uat:win": "electron-builder --config electron-builder.uat.cjs --win nsis --x64 --publish always",
+    "release:uat:mac": "electron-builder --config electron-builder.uat.cjs --mac dmg zip --universal --publish always"
   },
   "dependencies": {
     "big-integer": "1.6.52",
@@ -80,7 +86,11 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "notarize": true
-    }
+    },
+    "extraMetadata": {
+      "appEnvironment": "production"
+    },
+    "beforePack": "build/validate-environment.cjs"
   },
   "repository": {
     "type": "git",

@@ -1,7 +1,15 @@
 const {autoUpdater}=require('electron-updater');
 const {acceptsUpdate}=require('./environment.cjs');
-exports.installUpdates=({app,runtime={environment:'production',channel:'latest'},handle,notify,settings,saveSettings,busy,beforeInstall})=>{
-  let status={state:app.isPackaged?'idle':'development',version:app.getVersion()};
+exports.installUpdates=({app,runtime={environment:'production',channel:'latest'},handle,notify,settings,saveSettings,busy,beforeInstall,platform=process.platform,openReleases})=>{
+  if(platform !== 'win32') {
+    const status={state:app.isPackaged?'manual':'development',version:app.getVersion()};
+    handle('update-status',()=>status);
+    handle('update-check',async()=>{if(app.isPackaged) await openReleases();return status;});
+    for(const name of ['update-download','update-install','update-later']) handle(name,async()=>{throw new Error('Install macOS updates from GitHub Releases.');});
+    handle('update-preference',()=>settings());
+    return ()=>{};
+  }
+  let status={state:app.isPackaged?'idle':'development',version:app.getVersion(),lastCheckedAt:settings().lastUpdateCheckAt || null};
   let checking=false, installing=false;
   const deferredAtLaunch=settings().deferredUpdate;
   const later=()=>{settings().deferredUpdate=status.version;saveSettings();set("ready",{deferred:true});return status;};
@@ -21,7 +29,7 @@ exports.installUpdates=({app,runtime={environment:'production',channel:'latest'}
   autoUpdater.autoDownload=false;
   autoUpdater.autoInstallOnAppQuit=false;
   autoUpdater.channel=runtime.channel || 'latest';
-  autoUpdater.allowPrerelease=runtime.environment==='uat';
+  autoUpdater.allowPrerelease=false;
   // Setting channel enables downgrades in electron-updater; disable that explicitly.
   autoUpdater.allowDowngrade=false;
   autoUpdater.on('error',failed);
@@ -42,6 +50,10 @@ exports.installUpdates=({app,runtime={environment:'production',channel:'latest'}
     if(!app.isPackaged) return status;
     if(checking || ['downloading','ready'].includes(status.state)) return status;
     checking=true;
+    const lastCheckedAt=new Date().toISOString();
+    settings().lastUpdateCheckAt=lastCheckedAt;
+    saveSettings();
+    set("checking",{lastCheckedAt,message:""});
     try {await autoUpdater.checkForUpdates();} catch(error){failed(error);}
     finally {checking=false;}
     return status;

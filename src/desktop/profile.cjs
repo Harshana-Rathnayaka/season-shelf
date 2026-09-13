@@ -3,10 +3,10 @@ const {mkdirSync} = require('node:fs');
 
 // Called before the single-instance lock or any credential/database access.
 exports.configureProfile = (app, environment = app.isPackaged ? 'production' : 'development') => {
-  if (!['development', 'uat', 'production'].includes(environment)) throw new Error('Invalid profile environment');
+  if (!['development', 'production'].includes(environment)) throw new Error('Invalid profile environment');
   // Retain the existing source-development profile and installed production path.
   const directory = !app.isPackaged ? app.getPath('userData')
-    : path.join(app.getPath('appData'), environment === 'uat' ? 'Season Shelf UAT' : 'Season Shelf', 'installed');
+    : path.join(app.getPath('appData'), 'Season Shelf', 'installed');
   mkdirSync(directory, {recursive:true});
   app.setPath('userData', directory);
   app.setPath('sessionData', directory);

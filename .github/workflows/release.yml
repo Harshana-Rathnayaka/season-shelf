@@ -11,11 +11,6 @@ jobs:
   prepare:
     if: vars.RELEASES_ENABLED == 'true'
     runs-on: ubuntu-latest
-    outputs:
-      flavour: ${{ steps.plan.outputs.flavour }}
-      prefix: ${{ steps.plan.outputs.prefix }}
-      appName: ${{ steps.plan.outputs.appName }}
-      output: ${{ steps.plan.outputs.output }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -24,7 +19,6 @@ jobs:
         with:
           node-version: '24'
       - name: Validate release source and version
-        id: plan
         run: |
           node scripts/release-plan.mjs prepare
           git merge-base --is-ancestor HEAD origin/master
@@ -46,41 +40,24 @@ jobs:
           - platform: windows
             os: windows-latest
             target: win
-            certificate: CSC_LINK
-            password: CSC_KEY_PASSWORD
           - platform: macos
             os: macos-latest
             target: mac
-            certificate: MAC_CSC_LINK
-            password: MAC_CSC_KEY_PASSWORD
     runs-on: ${{ matrix.os }}
     env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      CSC_LINK: ${{ secrets[matrix.certificate] }}
-      CSC_KEY_PASSWORD: ${{ secrets[matrix.password] }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           cache: npm
-      - name: Require signing and notarization credentials
-        run: node -e "const names=['CSC_LINK','CSC_KEY_PASSWORD']; if(process.platform==='darwin') names.push('APPLE_ID','APPLE_APP_SPECIFIC_PASSWORD','APPLE_TEAM_ID'); for(const name of names) if(!process.env[name]) throw Error('Missing release secret '+name)"
       - run: npm ci
       - run: npm run check
       - run: npm test
-      - name: Build signed assets and upload to the draft
-        run: npm run release:${{ needs.prepare.outputs.prefix }}${{ matrix.target }} -- --config.forceCodeSigning=true --config.publish.releaseType=draft
-      - name: Verify macOS signature and notarization ticket
-        if: matrix.platform == 'macos'
-        env:
-          APP_BUNDLE: ${{ needs.prepare.outputs.output }}/mac-universal/${{ needs.prepare.outputs.appName }}.app
-        run: |
-          codesign --verify --deep --strict "$APP_BUNDLE"
-          xcrun stapler validate "$APP_BUNDLE"
+      - name: Build unsigned assets and upload to the draft
+        run: npm run release:${{ matrix.target }} -- --config.publish.releaseType=draft
   publish:
     needs: [prepare, build]
     runs-on: ubuntu-latest
@@ -93,12 +70,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_FLAVOUR: ${{ needs.prepare.outputs.flavour }}
         run: |
           gh release view "$GITHUB_REF_NAME" --json isDraft,assets > release-state.json
           node scripts/release-plan.mjs verify
-          if [ "$RELEASE_FLAVOUR" = uat ]; then
-            gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease --latest=false
-          else
-            gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease=false --latest
-          fi
+          gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease=false --latest

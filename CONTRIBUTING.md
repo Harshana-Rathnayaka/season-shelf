@@ -37,9 +37,9 @@ After a short save debounce, UI edits reload the renderer and backend edits requ
 | `npm run dev` / Electron: Development | Existing development data; automatic reload and DevTools |
 | `npm start` | Same development profile without automatic reload |
 
-Use development for coding and packaged builds for acceptance testing. UAT is an optional prerelease distribution, not another source-run mode. Installed UAT and production have separate names, app IDs, Chromium storage, login/history and updater channels. Build metadata selects an installed app's environment; command-line flags cannot change it. There are no separate local UAT/production-preview commands. All environments use the real Telegram service when you sign in; UAT is not a Telegram sandbox. Choose separate download folders when testing, as profile isolation cannot isolate a folder you manually select in both apps.
+Use development for coding and normal packaged builds for installer testing. Development and installed builds keep separate application data. Test fresh installs in a VM or separate OS account; updates preserve the installed profile. All builds use the real Telegram service and the download folders you select.
 
-See [release setup](docs/RELEASES.md) for UAT packaging and update channels. This project uses Electron's npm/VS Code workflow and electron-builder; a bundler is not required for its plain HTML/CSS/JavaScript renderer. See [Electron's setup and debugging guide](https://www.electronjs.org/docs/latest/tutorial/tutorial-first-app).
+See [release setup](README.md#build-and-release) for local packaging and publishing. This project uses Electron's npm/VS Code workflow and electron-builder; a bundler is not required for its plain HTML/CSS/JavaScript renderer. See [Electron's setup and debugging guide](https://www.electronjs.org/docs/latest/tutorial/tutorial-first-app).
 
 ## Make a reviewable change
 
@@ -72,4 +72,4 @@ Recommended master protections: require PRs, passing Windows checks and macOS ch
 
 ## Releases
 
-Contributors should not create release tags as part of normal feature work. Version bumps and release notes belong in a maintainer-reviewed release PR. Only tag a tested commit already merged into `master`, after publishing has been enabled and signing configured. See [release instructions](docs/RELEASES.md).
+Contributors should not create release tags as part of normal feature work. Version bumps and release notes belong in a maintainer-reviewed release PR. Only tag a tested commit already merged into `master`, after publishing has been enabled. See [release instructions](README.md#build-and-release).

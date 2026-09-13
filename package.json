@@ -1,7 +1,7 @@
 {
   "name": "season-shelf",
   "productName": "Season Shelf",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A local desktop companion for organising episodic Telegram downloads.",
   "private": true,
   "type": "module",
@@ -18,11 +18,7 @@
     "pack:win": "electron-builder --win nsis --x64 --publish never",
     "release:win": "electron-builder --win nsis --x64 --publish always",
     "pack:mac": "electron-builder --mac dmg zip --universal --publish never",
-    "release:mac": "electron-builder --mac dmg zip --universal --publish always",
-    "pack:uat:win": "electron-builder --config electron-builder.uat.cjs --win nsis --x64 --publish never",
-    "pack:uat:mac": "electron-builder --config electron-builder.uat.cjs --mac dmg zip --universal --publish never",
-    "release:uat:win": "electron-builder --config electron-builder.uat.cjs --win nsis --x64 --publish always",
-    "release:uat:mac": "electron-builder --config electron-builder.uat.cjs --mac dmg zip --universal --publish always"
+    "release:mac": "electron-builder --mac dmg zip --universal --publish always"
   },
   "dependencies": {
     "big-integer": "1.6.52",
@@ -42,11 +38,13 @@
     },
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE"
     ],
     "win": {
       "target": "nsis",
-      "icon": "src/desktop/assets/icon.ico"
+      "icon": "src/desktop/assets/icon.ico",
+      "verifyUpdateCodeSignature": false
     },
     "artifactName": "Season-Shelf-Setup-${version}-${arch}.${ext}",
     "publish": {
@@ -80,10 +78,9 @@
       "category": "public.app-category.utilities",
       "icon": "src/desktop/assets/icon.icns",
       "artifactName": "Season-Shelf-${version}-mac-${arch}.${ext}",
-      "hardenedRuntime": true,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": true
+      "hardenedRuntime": false,
+      "notarize": false,
+      "identity": null
     },
     "extraMetadata": {
       "appEnvironment": "production"
@@ -93,5 +90,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Harshana-Rathnayaka/season-shelf.git"
-  }
+  },
+  "license": "MIT"
 }

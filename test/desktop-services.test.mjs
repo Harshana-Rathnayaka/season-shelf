@@ -6,8 +6,8 @@ import {EventEmitter} from 'node:events';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
 
-async function load(file,dependency) {
-  const context={exports:{},Buffer,require:name=>name==='./environment.cjs'?require('../src/desktop/environment.cjs'):dependency,setTimeout:()=>({unref(){}}),setInterval:()=>({unref(){}}),clearTimeout(){},clearInterval(){}};
+async function load(file,dependency,extra={}) {
+  const context={exports:{},Buffer,process:{platform:"win32"},require:name=>name==='./environment.cjs'?require('../src/desktop/environment.cjs'):dependency,setTimeout:()=>({unref(){}}),setInterval:()=>({unref(){}}),clearTimeout(){},clearInterval(){},...extra};
   vm.runInNewContext(await fs.readFile(file,'utf8'),context);
   return context.exports;
 }
@@ -27,16 +27,16 @@ test('updater downloads automatically and refuses installation while work is act
   await handlers['update-preference']({enabled:true});updater.emit('update-available',{version:'0.3.0'});assert.equal(downloads,2);
 });
 
-test('UAT updater cannot download or install a stable release even after provider fallback',async()=>{
+test('production updater rejects prereleases even after provider fallback',async()=>{
   const updater=new EventEmitter();let downloads=0,installs=0;
   updater.downloadUpdate=async()=>downloads++;updater.quitAndInstall=()=>installs++;
   const handlers={};const {installUpdates}=await load('src/desktop/updates.cjs',{autoUpdater:updater});
-  installUpdates({app:{isPackaged:true,getVersion:()=> '0.1.0-uat.1'},runtime:{environment:'uat',channel:'uat'},handle:(n,f)=>handlers[n]=f,notify(){},settings:()=>({}),saveSettings(){},busy:()=>false,beforeInstall:async()=>{}});
-  assert.equal(updater.channel,'uat');assert.equal(updater.allowPrerelease,true);assert.equal(updater.allowDowngrade,false);
-  updater.emit('update-available',{version:'0.2.0'});assert.equal(downloads,0);
-  updater.emit('update-downloaded',{version:'0.2.0'});await assert.rejects(handlers['update-install']());assert.equal(installs,0);
-  updater.emit('update-available',{version:'0.2.0-uat.1'});assert.equal(downloads,1);
-  updater.emit('update-downloaded',{version:'0.2.0-uat.1'});await handlers['update-install']();assert.equal(installs,1);
+  installUpdates({app:{isPackaged:true,getVersion:()=> '1.0.0'},runtime:{environment:'production',channel:'latest'},handle:(n,f)=>handlers[n]=f,notify(){},settings:()=>({}),saveSettings(){},busy:()=>false,beforeInstall:async()=>{}});
+  assert.equal(updater.channel,'latest');assert.equal(updater.allowPrerelease,false);assert.equal(updater.allowDowngrade,false);
+  updater.emit('update-available',{version:'1.1.0-beta.1'});assert.equal(downloads,0);
+  updater.emit('update-downloaded',{version:'1.1.0-beta.1'});await assert.rejects(handlers['update-install']());assert.equal(installs,0);
+  updater.emit('update-available',{version:'1.1.0'});assert.equal(downloads,1);
+  updater.emit('update-downloaded',{version:'1.1.0'});await handlers['update-install']();assert.equal(installs,1);
 });
 test('tray keeps the app open until explicit quit and notifies a completion only once',async()=>{
   const notices=[];let hidden=0,quitting=false,pauses=0,closeToTray=true;
@@ -96,4 +96,64 @@ test('themed confirmations require the exact pending token and honour cancellati
   assert.throws(()=>handlers['confirmation-reply']({id:'wrong',response:1}),/expired/);
   handlers['confirmation-reply']({id:request.id,response:0});assert.equal((await result).response,0);
   assert.throws(()=>handlers['confirmation-reply']({id:request.id,response:1}),/expired/);
+});
+
+test('unsigned Mac builds offer manual releases and never call the native updater',async()=>{
+  const updater=new EventEmitter();let opened=0;
+  updater.checkForUpdates=async()=>{throw Error('Mac updater must not run');};
+  const handlers={};const {installUpdates}=await load('src/desktop/updates.cjs',{autoUpdater:updater});
+  const dispose=installUpdates({app:{isPackaged:true,getVersion:()=> '1.0.0'},platform:'darwin',openReleases:async()=>opened++,handle:(name,fn)=>handlers[name]=fn,settings:()=>({})});
+  assert.equal(handlers['update-status']().state,'manual');
+  await handlers['update-check']();assert.equal(opened,1);
+  await assert.rejects(handlers['update-install'](),/macOS/);
+  await assert.rejects(handlers['update-download'](),/macOS/);
+  assert.equal(updater.eventNames().length,0);dispose();
+});
+
+test('unsigned release config keeps updater identity and disables certificate requirements',async()=>{
+  const {build}=require('../package.json');
+  assert.equal(build.appId,'local.seasonshelf.desktop');
+  assert.equal(build.win.verifyUpdateCodeSignature,false);
+  assert.equal(build.mac.identity,null);
+  assert.equal(build.mac.notarize,false);
+  assert.equal(build.mac.hardenedRuntime,false);
+  assert.equal(build.nsis.deleteAppDataOnUninstall,false);
+  const {NsisUpdater}=require('electron-updater');
+  const updater=new NsisUpdater(null,{version:'1.0.0',name:'Season Shelf',isPackaged:true,appUpdateConfigPath:'unused',userDataPath:'unused',baseCachePath:'unused',onQuit(){}});
+  updater.configOnDisk={value:Promise.resolve({provider:'github',owner:'Harshana-Rathnayaka',repo:'season-shelf'})};
+  updater.verifyUpdateCodeSignature=()=>{throw Error('Unsigned release must not invoke certificate verification');};
+  assert.equal(await updater.verifySignature('unused.exe'),null);
+});
+
+test('Windows startup and daily checks download in-app, then restart invokes the installer',async()=>{
+  const scheduled=[];const updater=new EventEmitter();let downloads=0;let launched;
+  updater.checkForUpdates=async()=>updater.emit('update-available',{version:'1.0.1'});
+  updater.downloadUpdate=async()=>{downloads++;};
+  updater.quitAndInstall=(...args)=>{launched=args;};
+  const timer=(fn,delay)=>{scheduled.push({fn,delay});return {unref(){}};};
+  const {installUpdates}=await load('src/desktop/updates.cjs',{autoUpdater:updater},{setTimeout:timer,setInterval:timer});
+  const handlers={};installUpdates({app:{isPackaged:true,getVersion:()=> '1.0.0'},handle:(name,fn)=>handlers[name]=fn,notify(){},settings:()=>({}),saveSettings(){},busy:()=>false,beforeInstall:async()=>{}});
+  assert.deepEqual(scheduled.map(t=>t.delay),[1500,86400000]);
+  await scheduled[0].fn();assert.equal(downloads,1);
+  updater.emit('error',new Error('simulated interrupted transfer'));
+  await scheduled[1].fn();assert.equal(downloads,2);
+  updater.emit('update-downloaded',{version:'1.0.1'});
+  assert.equal(handlers['update-status']().state,'ready');
+  await handlers['update-install']();assert.deepEqual(launched,[false,true]);
+});
+
+test('update checks persist their timestamp and reject duplicate clicks while pending',async()=>{
+  const updater=new EventEmitter();let finish;let calls=0;let saves=0;
+  updater.checkForUpdates=()=>{calls++;return new Promise(resolve=>finish=resolve);};
+  const settings={lastUpdateCheckAt:'2026-01-01T00:00:00.000Z'};const handlers={};
+  const {installUpdates}=await load('src/desktop/updates.cjs',{autoUpdater:updater});
+  installUpdates({app:{isPackaged:true,getVersion:()=> '1.0.0'},handle:(n,f)=>handlers[n]=f,notify(){},settings:()=>settings,saveSettings:()=>saves++,busy:()=>false,beforeInstall:async()=>{}});
+  assert.equal(handlers['update-status']().lastCheckedAt,settings.lastUpdateCheckAt);
+  const pending=handlers['update-check']();
+  assert.equal(handlers['update-status']().state,'checking');
+  assert.equal(handlers['update-status']().lastCheckedAt,settings.lastUpdateCheckAt);
+  assert.notEqual(settings.lastUpdateCheckAt,'2026-01-01T00:00:00.000Z');
+  await handlers['update-check']();assert.equal(calls,1);assert.equal(saves,1);
+  updater.emit('update-not-available');finish();await pending;
+  assert.equal(handlers['update-status']().state,'current');
 });

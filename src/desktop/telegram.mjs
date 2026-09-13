@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+const { version: appVersion } = createRequire(import.meta.url)("../../package.json");
 import { rangeSource } from "./range-source.mjs";
 import { TelegramClient, Api } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
@@ -36,7 +38,7 @@ export class TelegramAdapter {
           requestRetries: 3,
           floodSleepThreshold: 0,
           deviceModel: "Season Shelf Desktop",
-          appVersion: "0.1.0",
+          appVersion,
         },
       );
       this.client.setLogLevel("none");

@@ -1,91 +1,83 @@
-# Desktop releases
+﻿# Desktop releases
 
-The updater is configured for public GitHub Releases at https://github.com/Harshana-Rathnayaka/season-shelf.
+## Develop and test locally
 
-## Build locally
+Use `npm run dev` (or VS Code F5) for development. Use the normal packaged app to test installation. Source and installed builds keep separate login, history and settings; downloaded folders are whichever paths you choose.
 
-Run `npm.cmd ci`, then `npm.cmd run pack:win`. The result is `release/Season-Shelf-Setup-<version>-x64.exe`, its `.blockmap` and `latest.yml`. The app uses an NSIS installer and preserves application data when uninstalling. Users do not need Node or development scripts.
+For a clean installation test, use a VM snapshot or a separate OS account. Reinstalling intentionally preserves existing installed data. You do not need another app environment to test an installer.
 
-If packaging in a restricted environment, set `ELECTRON_BUILDER_CACHE` to a writable cache directory. A cached local Electron distribution can be used with `npm.cmd run pack:win -- --config.electronDist=node_modules/electron/dist`.
+Install Node.js 24 and run `npm ci` first. In PowerShell, use `npm.cmd` if execution policy blocks `npm`.
 
-## Publish a new version
-
-1. Finish the changes and increment the version in package.json and package-lock.json, for example with `npm.cmd version patch --no-git-tag-version`.
-2. Commit the release version and changes. Merge the intended release into `master` first, after CI passes.
-3. Configure Windows signing and macOS signing/notarization (below), then deliberately set `RELEASES_ENABLED=true` when ready. Until then the tag workflow skips release jobs.
-4. Push a matching stable or UAT version tag on a commit already merged into `master`. The workflow validates ancestry/version, tests Windows and macOS, and uploads signed builds to a draft. Only after both jobs succeed and the expected assets exist does it publish the release. Failures leave the draft unpublished; already published versions cannot be overwritten.
-5. Confirm the release contains the Windows `.exe`, its `.blockmap` and `latest.yml`, plus the macOS universal `.dmg`, `.zip`, generated blockmaps and `latest-mac.yml`. Preserve these files from the same release. Do not embed a GitHub access token in the desktop app.
-
-Alternatively, a maintainer can run `npm.cmd run release:win` in an environment with an appropriately scoped `GH_TOKEN`. Do not put that token in a source file, client setting or committed environment file.
-
-## Client behavior
-
-Installed builds check shortly after startup and daily. Available updates download automatically. A ready update offers Restart now or Not now; deferred updates install on the next launch after verification. Development builds do not download updates. Installation is blocked during active transfers, naming, scanning, authentication, discovery or a watcher check.
-
-Signing is not configured. Before broad public distribution, configure a publisher-controlled Windows signing identity and follow electron-builder's signing setup. Never describe an unsigned installer as signed merely because the build log includes a signing step. HTTPS release hosting and update checksums are present but are not a substitute for publisher identity.
-
-Publishing and a real installed-version upgrade have not been performed. The first public release is the remaining external step that makes update delivery available to users.
-
-### Profile separation
-Installed builds store their encrypted session, SQLite history and staging under `%APPDATA%/Season Shelf/installed`. Development keeps its original Electron profile. Never copy a developer profile into a release. Updates keep the installed profile and onboarding completion flag. Existing files on disk are not moved by this change.
-
-## Signing before a public release
-
-An unsigned executable has no trusted publisher signature. Authenticode signing identifies the publisher and lets Windows detect changes to the signed file. A signature is separate from the project's source-code license.
-
-Before publishing:
-
-1. Obtain a suitable code-signing certificate or an eligible cloud signing service; complete the provider's identity verification.
-2. Configure the Windows signing method supported by our pinned electron-builder 26 toolchain. For example, Azure Trusted Signing uses `win.azureSignOptions`; certificate/hardware-backed signing depends on the provider.
-3. Keep signing credentials in protected CI secrets or the provider's key service, never in the repository.
-4. Build a signed release, verify its Authenticode signature and test installation/update behaviour before publishing.
-
-See [electron-builder v26 Windows signing documentation](https://www.electron.build/v26/docs/features/code-signing/code-signing-win/).
-
-### Deferred updates
-
-The pinned electron-updater 6.x implementation rechecks releases on startup and verifies the cached download before a deferred install. It does not use the newer 7.x `autoInstallEvent` API. This currently needs network access on the next launch. Development builds do not check/install real updates.
-
-See [contribution and PR policy](../CONTRIBUTING.md). Normal CI never packages an installer. No extra artifact-building workflow is needed: the release job already does that before publishing.
-
-## macOS release setup
-
-The macOS runner builds one universal application for Intel and Apple Silicon. It produces `Season-Shelf-<version>-mac-universal.dmg` for installation and the corresponding ZIP for automatic updates. A universal build avoids separate architecture jobs overwriting `latest-mac.yml`.
-
-Configure these repository Actions secrets before enabling releases:
-
-| Secret | Purpose |
-| --- | --- |
-| CSC_LINK / CSC_KEY_PASSWORD | Existing Windows certificate and password |
-| MAC_CSC_LINK | Base64-encoded Developer ID Application certificate (.p12), including its private key |
-| MAC_CSC_KEY_PASSWORD | Password for that exported certificate |
-| APPLE_ID | Apple Developer account email |
-| APPLE_APP_SPECIFIC_PASSWORD | App-specific password for notarization |
-| APPLE_TEAM_ID | Apple Developer team ID |
-
-The workflow requires credentials, enables hardened runtime and JIT entitlements, forces signing, notarizes through electron-builder, and verifies the stapled ticket. Keep credentials and certificates in Actions secrets.
-
-On a Mac, `npm run pack:mac` builds without publishing; `npm run release:mac` publishes with configured credentials. Prefer the tag workflow for public releases because it coordinates both platforms. For deliberate unsigned local packaging only, use `npm run pack:mac -- --config.mac.identity=null --config.mac.notarize=false --config.mac.hardenedRuntime=false`. This cannot validate the signed update path.
-
-Install by opening the DMG and dragging Season Shelf to Applications. Installed macOS data lives under `~/Library/Application Support/Season Shelf/installed`; updates preserve it. DMG and ZIP are both required for macOS automatic updates. The artifact names include the platform to avoid Windows collisions.
-
-Complete native signed install/update acceptance on a Mac before the first public release.
-
-References: [electron-builder v26 macOS configuration](https://www.electron.build/v26/docs/mac/), [publishing](https://www.electron.build/v26/docs/publish/) and [notarization integration](https://github.com/electron/notarize).
-
-## Optional UAT prereleases
-
-Production keeps the existing app ID and installed profile. UAT builds use **Season Shelf UAT**, app ID `local.seasonshelf.desktop.uat` and the `uat` update channel. Production accepts only stable versions; UAT accepts only `X.Y.Z-uat.N` versions. Channel selection disables downgrades, and runtime checks reject cross-environment updates even if a provider returns an unexpected release.
-
-| Build | Windows | macOS |
+| Host computer | Command | Output in `release/` |
 | --- | --- | --- |
-| Production | `npm run pack:win` | `npm run pack:mac` |
-| UAT | `npm run pack:uat:win` | `npm run pack:uat:mac` |
+| Windows | `npm run pack:win` | `Season-Shelf-Setup-1.0.0-x64.exe` |
+| Mac | `npm run pack:mac` | `Season-Shelf-1.0.0-mac-universal.dmg` and `.zip` |
 
-Production output is in `release/`; UAT output is in `release/uat/`. A local UAT build from a stable package version gets a `-uat.0` suffix. For a published UAT version, update package.json and package-lock.json explicitly, for example `npm version 0.2.0-uat.1 --no-git-tag-version`, and merge the version commit before pushing `v0.2.0-uat.1`. Stable releases use matching `v0.2.0` tags. Do not publish local -uat.0 builds repeatedly under one version.
+These commands never publish. The Mac build needs a Mac and produces one app for Intel and Apple Silicon. Open the DMG and drag the app into Applications. Windows uses an NSIS installer.
 
-The gated tag workflow chooses the correct build configuration. UAT publishes a GitHub prerelease, never marks it latest, and includes `uat.yml` and `uat-mac.yml`. Production publishes the stable release with `latest.yml` and `latest-mac.yml`. Both require signing, notarization and complete Windows/macOS assets. Keep the publishing gate disabled until signed install/update acceptance succeeds.
+Without signing credentials, Windows local packaging is unsigned. For a deliberately unsigned Mac test build, run:
 
-Installed profiles live under the OS application-data directory: `Season Shelf/installed` for production and `Season Shelf UAT/installed` for UAT. Source launches always use the existing development profile. No sessions or history are copied between profiles. Former source-preview folders, if created, are left untouched but are no longer used.
+```sh
+npm run pack:mac -- --config.mac.identity=null --config.mac.notarize=false --config.mac.hardenedRuntime=false
+```
 
-See [electron-builder update channels](https://www.electron.build/v26/docs/tutorials/release-using-channels/). For this app, development plus production is the everyday workflow; UAT is only a separately installed prerelease for acceptance testing.
+Unsigned packages can trigger OS security warnings and do not validate signed updates. Prefer a signed build for final acceptance.
+
+## Signing
+
+Signing proves the publisher's identity and detects changes to an executable. It is separate from the source-code license. Credentials are not supplied by this repository.
+
+### Windows
+
+Choose a publicly trusted code-signing provider and complete identity verification. Current providers commonly require hardware or cloud protection for private keys; do not assume a newly purchased certificate can be exported into a PFX file.
+
+The current workflow supports a certificate file through `CSC_LINK` and `CSC_KEY_PASSWORD` GitHub Actions secrets. Use this only when your provider supports that method. A hardware token or cloud service requires its provider-specific signing integration. Azure Artifact Signing (formerly Trusted Signing) is another option where eligible; electron-builder 26 uses `win.azureSignOptions` and Azure authentication. Its configuration and the workflow credential check must be adapted before using it. Keep the same publisher identity for future updates. Signing does not guarantee immediate SmartScreen reputation.
+
+References: [electron-builder 26 Windows signing](https://www.electron.build/v26/docs/features/code-signing/code-signing-win/) and [Microsoft signing options](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
+
+### macOS
+
+1. Enrol in the Apple Developer Program (normally USD 99/year).
+2. Create a **Developer ID Application** certificate, then export it with its private key as a password-protected `.p12` from Keychain Access.
+3. Add the following repository Actions secrets:
+
+| Secret | Value |
+| --- | --- |
+| `MAC_CSC_LINK` | Base64-encoded `.p12` certificate |
+| `MAC_CSC_KEY_PASSWORD` | Certificate export password |
+| `APPLE_ID` | Apple Developer account email |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for notarization |
+| `APPLE_TEAM_ID` | Developer team ID |
+
+For a local signed Mac build, set `CSC_LINK` and `CSC_KEY_PASSWORD` in your shell instead of the `MAC_` names, plus the three Apple variables. The workflow maps the Mac secrets automatically. Never commit secrets or certificates.
+
+The build signs with hardened runtime, submits the app for Apple's notarization and verifies its signature and stapled ticket in CI.
+
+References: [Apple membership](https://developer.apple.com/support/compare-memberships/) and [Electron notarization](https://github.com/electron/notarize).
+
+## First release: 1.0.0
+
+1. Test local installers on Windows and macOS. Configure and validate signing for both platforms.
+2. Merge the intended code and the `1.0.0` package/lockfile version into `master`, with CI passing.
+3. Add signing secrets under GitHub **Settings > Secrets and variables > Actions**. Set the repository variable `RELEASES_ENABLED` to `true` only when ready to publish.
+4. On the latest local `master`, run:
+
+```sh
+git pull --ff-only
+git tag -a v1.0.0 -m "Season Shelf 1.0.0"
+git push origin v1.0.0
+```
+
+The tag workflow checks version and master ancestry, creates an unpublished draft, tests and builds on Windows and macOS, signs the builds, then uploads the assets. It publishes automatically only after both platforms succeed and the required assets are present. A failure leaves the draft unpublished. Do not push the tag until you are ready for public publication.
+
+GitHub Releases hosts the EXE, DMG, ZIP, blockmaps and `latest.yml` / `latest-mac.yml`. The ZIP and update metadata are necessary for the updater: keep them together with the installers. No second build workflow or separate hosting service is needed. Never overwrite a published version.
+
+For later releases, increment the version (for example `npm version patch --no-git-tag-version`), merge, and push the matching tag.
+
+## Testing and receiving updates
+
+A single local installer tests installation, not automatic updates. To test the whole updater before public distribution, use a temporary GitHub repository as a test feed, build two increasing stable versions with the same signing identity and repository override, and publish both there. In a disposable VM/account, install the older version, make the newer version available, and verify download, restart and preserved data. Keep the production repository configuration unchanged. Private feeds require additional authentication; never embed a GitHub token in the app.
+
+Installed apps check after startup and daily and download available stable updates automatically. Users choose **Restart now** or **Not now**. Deferred installation is retried on next launch after verification; the current updater needs network access for that check. Active work blocks installation. Development builds do not install updates.
+
+Production profiles live under the OS application-data directory in `Season Shelf/installed`. Updates retain login, settings, onboarding and history. Files on disk are not moved. No signed release or real installed-version upgrade has been verified yet.

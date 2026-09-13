@@ -21,7 +21,7 @@ exports.installUpdates=({app,runtime={environment:'production',channel:'latest'}
   autoUpdater.autoDownload=false;
   autoUpdater.autoInstallOnAppQuit=false;
   autoUpdater.channel=runtime.channel || 'latest';
-  autoUpdater.allowPrerelease=runtime.environment==='uat';
+  autoUpdater.allowPrerelease=false;
   // Setting channel enables downgrades in electron-updater; disable that explicitly.
   autoUpdater.allowDowngrade=false;
   autoUpdater.on('error',failed);

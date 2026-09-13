@@ -1,6 +1,5 @@
 const definitions = {
   development: {name: 'Season Shelf Dev', appId: 'local.seasonshelf.desktop.dev', channel: null},
-  uat: {name: 'Season Shelf UAT', appId: 'local.seasonshelf.desktop.uat', channel: 'uat'},
   production: {name: 'Season Shelf', appId: 'local.seasonshelf.desktop', channel: 'latest'},
 };
 
@@ -17,6 +16,5 @@ exports.resolveEnvironment = ({isPackaged, metadata = {}, argv = []}) => {
 
 exports.acceptsUpdate = (environment, version) => {
   if (typeof version !== 'string') return false;
-  return environment === 'uat' ? /^\d+\.\d+\.\d+-uat\.\d+$/.test(version)
-    : environment === 'production' && /^\d+\.\d+\.\d+$/.test(version);
+  return environment === 'production' && /^\d+\.\d+\.\d+$/.test(version);
 };

@@ -12,9 +12,8 @@ const require = createRequire(import.meta.url);
 test('packaged identity ignores launch overrides and development defaults are explicit', () => {
   assert.equal(resolveEnvironment({isPackaged:false}).environment, 'development');
   assert.equal(resolveEnvironment({isPackaged:false,argv:['--dev']}).liveReload, true);
-  assert.equal(resolveEnvironment({isPackaged:false,argv:['--environment=uat','--dev']}).environment, 'development');
-  assert.equal(resolveEnvironment({isPackaged:true,metadata:{appEnvironment:'uat'},argv:['--environment=production','--dev']}).environment, 'uat');
-  assert.equal(resolveEnvironment({isPackaged:true,argv:['--environment=uat']}).environment, 'production');
+  assert.equal(resolveEnvironment({isPackaged:false,argv:['--environment=other','--dev']}).environment, 'development');
+  assert.equal(resolveEnvironment({isPackaged:true,argv:['--environment=other']}).environment, 'production');
   assert.throws(() => resolveEnvironment({isPackaged:true,metadata:{appEnvironment:'unknown'}}), /Invalid/);
   assert.equal(resolveEnvironment({isPackaged:false,argv:['--environment=production']}).environment, 'development');
 });
@@ -23,7 +22,7 @@ test('source and installed environments isolate storage while preserving product
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'shelf-environments-'));
   t.after(() => fs.rm(root,{recursive:true,force:true}));
   const dirs = [];
-  for (const [environment,isPackaged] of [['development',false],['uat',true],['production',true]]) {
+  for (const [environment,isPackaged] of [['development',false],['production',true]]) {
     const paths={appData:root,userData:path.join(root,'season-shelf')};
     const app={isPackaged,getPath:key=>paths[key],setPath:(key,value)=>paths[key]=value};
     const dir=configureProfile(app,environment);
@@ -39,11 +38,9 @@ test('source and installed environments isolate storage while preserving product
 });
 
 test('release channels reject cross-environment versions and incomplete assets', () => {
-  assert.equal(acceptsUpdate('uat','0.2.0-uat.1'),true);
-  assert.equal(acceptsUpdate('uat','0.2.0'),false);
-  assert.equal(acceptsUpdate('production','0.2.0-uat.1'),false);
+  assert.equal(acceptsUpdate('production','0.2.0-beta.1'),false);
   assert.equal(acceptsUpdate('development','0.2.0'),false);
-  for (const version of ['0.2.0','0.2.0-uat.1']) {
+  for (const version of ['0.2.0']) {
     const plan=releasePlan(`v${version}`,version);
     const release={isDraft:true,assets:plan.assets.map(name=>({name}))};
     verifyRelease(release,plan);
@@ -54,17 +51,11 @@ test('release channels reject cross-environment versions and incomplete assets',
   assert.throws(()=>releasePlan('v0.2.0-beta.1','0.2.0-beta.1'),/Tag/);
 });
 
-test('UAT packaging carries a separate identity and schema-valid update configuration', async () => {
+test('production packaging validates configuration and refuses prerelease versions', async () => {
   const production=require('../package.json').build;
-  const uat=require('../electron-builder.uat.cjs');
   const {validateConfiguration}=require('app-builder-lib/out/util/config/config');
   await validateConfiguration(production);
-  await validateConfiguration(uat);
-  assert.notEqual(uat.appId,production.appId);
-  assert.notEqual(uat.productName,production.productName);
-  assert.equal(uat.publish.channel,'uat');
-  assert.equal(uat.extraMetadata.appEnvironment,'uat');
   const validate=require('../build/validate-environment.cjs');
-  validate({packager:{config:uat,appInfo:{version:uat.extraMetadata.version}}});
-  assert.throws(()=>validate({packager:{config:production,appInfo:{version:uat.extraMetadata.version}}}),/Production requires/);
+  validate({packager:{config:production,appInfo:{version:'1.0.0'}}});
+  assert.throws(()=>validate({packager:{config:production,appInfo:{version:'1.0.0-beta.1'}}}),/Production requires/);
 });

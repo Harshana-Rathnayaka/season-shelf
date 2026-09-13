@@ -27,16 +27,16 @@ test('updater downloads automatically and refuses installation while work is act
   await handlers['update-preference']({enabled:true});updater.emit('update-available',{version:'0.3.0'});assert.equal(downloads,2);
 });
 
-test('UAT updater cannot download or install a stable release even after provider fallback',async()=>{
+test('production updater rejects prereleases even after provider fallback',async()=>{
   const updater=new EventEmitter();let downloads=0,installs=0;
   updater.downloadUpdate=async()=>downloads++;updater.quitAndInstall=()=>installs++;
   const handlers={};const {installUpdates}=await load('src/desktop/updates.cjs',{autoUpdater:updater});
-  installUpdates({app:{isPackaged:true,getVersion:()=> '0.1.0-uat.1'},runtime:{environment:'uat',channel:'uat'},handle:(n,f)=>handlers[n]=f,notify(){},settings:()=>({}),saveSettings(){},busy:()=>false,beforeInstall:async()=>{}});
-  assert.equal(updater.channel,'uat');assert.equal(updater.allowPrerelease,true);assert.equal(updater.allowDowngrade,false);
-  updater.emit('update-available',{version:'0.2.0'});assert.equal(downloads,0);
-  updater.emit('update-downloaded',{version:'0.2.0'});await assert.rejects(handlers['update-install']());assert.equal(installs,0);
-  updater.emit('update-available',{version:'0.2.0-uat.1'});assert.equal(downloads,1);
-  updater.emit('update-downloaded',{version:'0.2.0-uat.1'});await handlers['update-install']();assert.equal(installs,1);
+  installUpdates({app:{isPackaged:true,getVersion:()=> '1.0.0'},runtime:{environment:'production',channel:'latest'},handle:(n,f)=>handlers[n]=f,notify(){},settings:()=>({}),saveSettings(){},busy:()=>false,beforeInstall:async()=>{}});
+  assert.equal(updater.channel,'latest');assert.equal(updater.allowPrerelease,false);assert.equal(updater.allowDowngrade,false);
+  updater.emit('update-available',{version:'1.1.0-beta.1'});assert.equal(downloads,0);
+  updater.emit('update-downloaded',{version:'1.1.0-beta.1'});await assert.rejects(handlers['update-install']());assert.equal(installs,0);
+  updater.emit('update-available',{version:'1.1.0'});assert.equal(downloads,1);
+  updater.emit('update-downloaded',{version:'1.1.0'});await handlers['update-install']();assert.equal(installs,1);
 });
 test('tray keeps the app open until explicit quit and notifies a completion only once',async()=>{
   const notices=[];let hidden=0,quitting=false,pauses=0,closeToTray=true;

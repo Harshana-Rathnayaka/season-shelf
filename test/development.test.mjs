@@ -4,8 +4,8 @@ import fs from "node:fs/promises";
 import vm from "node:vm";
 import path from "node:path";
 
-test("development reloads UI during downloads but defers backend restart and sign-in reload", async () => {
-  let onChange, apply, authenticating = false, reloads = 0, restarts = 0, quits = 0;
+test("development reloads despite active work and requests one normal restart", async () => {
+  let onChange, apply, beforeQuit, cleanups = 0, reloads = 0, restarts = 0, quits = 0;
   const exported = {};
   const queue = {running:new Map([["download",{}]]),namingLocks:new Set()};
   const sandbox = {
@@ -20,16 +20,17 @@ test("development reloads UI during downloads but defers backend restart and sig
     },
   };
   vm.runInNewContext(await fs.readFile("src/desktop/development.cjs","utf8"),sandbox);
-  exported.enableDevelopment({queue,isAuthenticating:()=>authenticating,
-    app:{once(){},relaunch(){restarts++;},quit(){quits++;}},
+  exported.enableDevelopment({queue,isAuthenticating:()=>true,beforeReload:()=>cleanups++,
+    app:{once(_event,callback){beforeQuit=callback;},relaunch(){restarts++;},quit(){quits++;beforeQuit();}},
     win:{isDestroyed:()=>false,webContents:{reloadIgnoringCache(){reloads++;}}}});
   onChange("change","ui/styles.css"); apply();
   assert.equal(reloads,1); assert.equal(restarts,0);
+  assert.equal(cleanups,1);
+  onChange("change","ui/app.mjs"); apply();
+  assert.equal(reloads,2); assert.equal(cleanups,2);
   onChange("change","core/queue.mjs"); apply();
-  assert.equal(restarts,0);
-  queue.running.clear(); apply();
+  assert.equal(queue.running.size,1);
   assert.equal(restarts,1); assert.equal(quits,1);
-  authenticating=true; onChange("change","ui/app.mjs"); apply();
-  assert.equal(reloads,1);
-  authenticating=false; apply(); assert.equal(reloads,2);
+  onChange("change","core/queue.mjs"); apply();
+  assert.equal(restarts,1); assert.equal(quits,1);
 });

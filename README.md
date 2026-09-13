@@ -59,7 +59,7 @@ npm run dev
 
 Missing a channel? Select **All channels** or adjust **Settings > Channel filtering**. No verified results? Check other available qualities and Unverified. Replay onboarding from **Settings > About > Watch guide again**.
 
-Use `npm start` for a normal launch (`npm.cmd start` in PowerShell). Windows also provides `Setup.cmd`, `Dev.cmd` and `Start.cmd`.
+Use `npm start` for a normal source launch or `npm run dev` for automatic reload. In VS Code, press **F5** and select **Electron: Development** after installing dependencies. Use `npm.cmd` in PowerShell if its execution policy blocks `npm`. See [Contributing](CONTRIBUTING.md#develop-locally) for debugging. UAT installers are available to build for isolated acceptance testing.
 
 Just exploring? Open the [sample preview](docs/preview.html) locally. It uses sample data and never connects to your account.
 

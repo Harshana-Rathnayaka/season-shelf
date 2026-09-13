@@ -25,8 +25,10 @@ let watcher,
   quitting = false;
 const uiFile = path.join(__dirname, "../ui/index.html");
 const uiUrl = pathToFileURL(uiFile).href;
-// Keep development data intact; installed builds use a separate, stable profile across updates.
-require("./profile.cjs").configureProfile(app);
+const runtime = require("./environment.cjs").resolveEnvironment({isPackaged:app.isPackaged,metadata:require('../../package.json'),argv:process.argv});
+require("./profile.cjs").configureProfile(app, runtime.environment);
+app.setName(runtime.name);
+app.setAppUserModelId(runtime.appId);
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on("second-instance", () => {
   win?.show();
@@ -193,7 +195,7 @@ app
         settings, channels, catalogue, jobs:queue.snapshot(), usage:queue.usage,
         currentBatchId:queue.currentBatchId, connected:adapter.connected, profile:adapter.profile,
         restoringSession:!!adapter.connecting, connectionError,
-        hasCredentials:!!store.get("credentials",null),version:app.getVersion(),customTitleBar:process.platform === "win32",
+        hasCredentials:!!store.get("credentials",null),version:app.getVersion(),appName:runtime.name,environment:runtime.environment,customTitleBar:process.platform === "win32",
       };
     });
     handle("connect", async (payload) => {
@@ -436,7 +438,7 @@ app
       height: 920,
       minWidth: 1024,
       minHeight: 720,
-      title: "Season Shelf",
+      title: runtime.name,
       icon:path.join(__dirname,"assets/icon.ico"),
       ...(process.platform === "win32" ? {titleBarStyle:"hidden",titleBarOverlay:{color:"#101113",symbolColor:"#edf0ef",height:32}} : {}),
       backgroundColor: "#101113",
@@ -453,13 +455,17 @@ app
     win.webContents.session.setPermissionRequestHandler(
       (_webContents, _permission, callback) => callback(false),
     );
-    app.setAppUserModelId("local.seasonshelf.desktop");
+    win.on('page-title-updated', event => event.preventDefault());
     tray=require("./tray.cjs").installTray({win,queue,settings:()=>settings,isQuitting:()=>quitting});
-    require("./updates.cjs").installUpdates({app,handle,notify,settings:()=>settings,saveSettings:()=>store.set("settings",settings),busy:()=>watcher.checking || queue.running.size || queue.namingLocks.size || scanning || !!discovery.operation || !!authPrompt || adapter.connecting,beforeInstall:async()=>{watcher.stop();await queue.stop();await adapter.disconnect();quitting=true;}});
+    require("./updates.cjs").installUpdates({app,runtime,handle,notify,settings:()=>settings,saveSettings:()=>store.set("settings",settings),busy:()=>watcher.checking || queue.running.size || queue.namingLocks.size || scanning || !!discovery.operation || !!authPrompt || adapter.connecting,beforeInstall:async()=>{watcher.stop();await queue.stop();await adapter.disconnect();quitting=true;}});
     await win.loadFile(uiFile);
-    if (!app.isPackaged && process.argv.includes("--dev")) {
+    if (runtime.liveReload) {
       const { enableDevelopment } = require("./development.cjs");
-      enableDevelopment({ app, win, queue, adapter, isAuthenticating: () => !!authPrompt || adapter.connecting || scanning || !!discovery.operation });
+      enableDevelopment({ app, win, beforeReload: () => {
+        authPrompt?.reject(new Error('Sign-in cancelled by development reload'));
+        authPrompt = null;
+        discovery?.cancel();
+      } });
     }
   })
   .catch((error) => {

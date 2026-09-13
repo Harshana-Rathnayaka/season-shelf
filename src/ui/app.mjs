@@ -133,7 +133,7 @@ function render() {
     (job) => !["complete", "deleted", "missing", "cancelled"].includes(job.status),
   ).length;
   $("#app").classList.toggle("custom-titlebar", !!state.customTitleBar);
-  $("#app").innerHTML = `${state.customTitleBar ? `<div class="app-titlebar"><span>${icon("shelf")} Season Shelf</span></div>` : ""}<aside class="sidebar" id="workspace-sidebar"><button class="icon-button sidebar-toggle" data-action="toggle-sidebar" aria-controls="workspace-sidebar" aria-expanded="${!state.settings.sidebarCollapsed}" aria-label="${state.settings.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}" title="${state.settings.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon("sidebar")}</button>
+  $("#app").innerHTML = `${state.customTitleBar ? `<div class="app-titlebar"><span>${icon("shelf")} ${escape(state.appName || "Season Shelf")}</span></div>` : ""}<aside class="sidebar" id="workspace-sidebar"><button class="icon-button sidebar-toggle" data-action="toggle-sidebar" aria-controls="workspace-sidebar" aria-expanded="${!state.settings.sidebarCollapsed}" aria-label="${state.settings.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}" title="${state.settings.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon("sidebar")}</button>
     <a class="brand" href="#" data-action="nav" data-page="library"><span class="brand-mark">${icon("shelf")}</span><span>season<span class="brand-light">shelf</span><small>YOUR SERIES, SORTED.</small></span></a>
     <div class="nav-label">WORKSPACE</div>
     <nav aria-label="Main navigation">
@@ -154,7 +154,7 @@ function render() {
   </aside>
   <div class="main-shell workspace-shell ${state.page === "library" ? "library-shell" : ""}"><header class="topbar"><span class="breadcrumb">Workspace ${icon("chevron")} <strong>${{ library: "Series library", queue: "Downloads", saved: "Saved files", settings: "Settings", help: "How it works" }[state.page]}</strong></span><div class="top-actions">${state.demo ? '<span class="demo-pill">SAMPLE PREVIEW</span>' : ""}<button class="icon-button" data-action="theme" title="Toggle colour theme" aria-label="Toggle colour theme">${icon("moon")}</button><button class="connection" data-action="connect"><i class="${state.connected ? "online" : ""}"></i>${state.connected ? "Connected" : state.restoringSession ? "Reconnecting..." : "Connect Telegram"}${icon("arrow")}</button></div></header>
   <main>${state.page === "library" ? library() : state.page === "settings" ? settingsPage() : state.page === "help" ? helpPage() : queuePage(state.page === "saved")}</main>
-  <footer class="app-footer"><span>${icon("shield")} Local by design. Yours to control.</span><span>Season Shelf <b>0.1</b></span></footer></div>`;
+  <footer class="app-footer"><span>${icon("shield")} Local by design. Yours to control.</span><span>${escape(state.appName || "Season Shelf")} <b>${escape(state.version || "0.1")}</b></span></footer></div>`;
   if (state.page === "library")
     $("#select-all")?.setAttribute("aria-label", "Select all visible episodes");
   if ($(".episode-table") && libraryViewKey === viewKey) $(".episode-table").scrollTop = oldTop;

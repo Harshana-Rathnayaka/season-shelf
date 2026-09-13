@@ -11,6 +11,11 @@ jobs:
   prepare:
     if: vars.RELEASES_ENABLED == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      flavour: ${{ steps.plan.outputs.flavour }}
+      prefix: ${{ steps.plan.outputs.prefix }}
+      appName: ${{ steps.plan.outputs.appName }}
+      output: ${{ steps.plan.outputs.output }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -19,8 +24,9 @@ jobs:
         with:
           node-version: '24'
       - name: Validate release source and version
+        id: plan
         run: |
-          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("package.json")); const tag=process.env.GITHUB_REF_NAME; if (!/^v\d+\.\d+\.\d+$/.test(tag) || tag !== `v${p.version}`) throw Error("Stable tag must match package.json version");'
+          node scripts/release-plan.mjs prepare
           git merge-base --is-ancestor HEAD origin/master
       - name: Create or reuse an unpublished draft
         env:
@@ -39,12 +45,12 @@ jobs:
         include:
           - platform: windows
             os: windows-latest
-            command: release:win
+            target: win
             certificate: CSC_LINK
             password: CSC_KEY_PASSWORD
           - platform: macos
             os: macos-latest
-            command: release:mac
+            target: mac
             certificate: MAC_CSC_LINK
             password: MAC_CSC_KEY_PASSWORD
     runs-on: ${{ matrix.os }}
@@ -67,34 +73,32 @@ jobs:
       - run: npm run check
       - run: npm test
       - name: Build signed assets and upload to the draft
-        run: npm run ${{ matrix.command }} -- --config.forceCodeSigning=true --config.publish.releaseType=draft
+        run: npm run release:${{ needs.prepare.outputs.prefix }}${{ matrix.target }} -- --config.forceCodeSigning=true --config.publish.releaseType=draft
       - name: Verify macOS signature and notarization ticket
         if: matrix.platform == 'macos'
+        env:
+          APP_BUNDLE: ${{ needs.prepare.outputs.output }}/mac-universal/${{ needs.prepare.outputs.appName }}.app
         run: |
-          codesign --verify --deep --strict "release/mac-universal/Season Shelf.app"
-          xcrun stapler validate "release/mac-universal/Season Shelf.app"
+          codesign --verify --deep --strict "$APP_BUNDLE"
+          xcrun stapler validate "$APP_BUNDLE"
   publish:
     needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
       - name: Verify both platforms and publish the complete release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_FLAVOUR: ${{ needs.prepare.outputs.flavour }}
         run: |
           gh release view "$GITHUB_REF_NAME" --json isDraft,assets > release-state.json
-          node <<'NODE'
-          const release = require('./release-state.json');
-          if (!release.isDraft) throw Error('Expected an unpublished draft');
-          const version = process.env.GITHUB_REF_NAME.slice(1);
-          const names = new Set(release.assets.map(asset => asset.name));
-          for (const name of [
-            `Season-Shelf-Setup-${version}-x64.exe`,
-            `Season-Shelf-Setup-${version}-x64.exe.blockmap`,
-            'latest.yml',
-            `Season-Shelf-${version}-mac-universal.dmg`,
-            `Season-Shelf-${version}-mac-universal.zip`,
-            'latest-mac.yml',
-          ]) if (!names.has(name)) throw Error(`Missing release asset: ${name}`);
-          NODE
-          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+          node scripts/release-plan.mjs verify
+          if [ "$RELEASE_FLAVOUR" = uat ]; then
+            gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease=false --latest
+          fi

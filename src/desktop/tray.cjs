@@ -1,5 +1,9 @@
 const {Tray,Menu,nativeImage,Notification,app}=require('electron');
-exports.installTray = ({win,queue,settings,isQuitting}) => {
+exports.installTray = ({win,queue,settings,isQuitting,enabled=true}) => {
+  if(!enabled) {
+    win.on('close',()=>{if(!isQuitting())queue.controlAll('pause');});
+    return null;
+  }
   const pixels=Buffer.alloc(32*32*4);
   for(let y=4;y<28;y++) for(let x=5;x<27;x++) {
     if(x<8 || x>23 || y<7 || y>24 || (y>14 && y<18)) {

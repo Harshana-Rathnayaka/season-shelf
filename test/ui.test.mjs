@@ -422,3 +422,11 @@ test('update check button shows loading until completion and displays the last c
   assert.doesNotMatch(f.document.querySelector('.update-last-checked').textContent,/Never/);
   assert.match(f.document.body.textContent,/MIT License/);
 });
+
+test('development updates explain why checks are unavailable without a misleading timestamp',async t=>{
+  const f=await fixture(t,{version:'1.0.0',settings:{theme:'dark'},channels:[],jobs:[]},async()=>({state:'development'}));
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('[data-action="update-check"]').disabled,true);
+  assert.equal(f.document.querySelector('.update-last-checked'),null);
+  assert.match(f.document.querySelector('#update-status').textContent,/disabled in development/);
+});

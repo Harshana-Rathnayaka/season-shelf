@@ -29,7 +29,12 @@ const runtime = require("./environment.cjs").resolveEnvironment({isPackaged:app.
 require("./profile.cjs").configureProfile(app, runtime.environment);
 app.setName(runtime.name);
 app.setAppUserModelId(runtime.appId);
-if (!app.requestSingleInstanceLock()) app.quit();
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  // quit is asynchronous (especially with a debugger attached). Do not start
+  // storage, Chromium or a second window while this process is exiting.
+  return;
+}
 app.on("second-instance", () => {
   win?.show();
   win?.focus();
@@ -456,7 +461,7 @@ app
       (_webContents, _permission, callback) => callback(false),
     );
     win.on('page-title-updated', event => event.preventDefault());
-    tray=require("./tray.cjs").installTray({win,queue,settings:()=>settings,isQuitting:()=>quitting});
+    tray=require("./tray.cjs").installTray({win,queue,enabled:runtime.environment !== 'development',settings:()=>settings,isQuitting:()=>quitting});
     require("./updates.cjs").installUpdates({app,runtime,openReleases:()=>shell.openExternal("https://github.com/Harshana-Rathnayaka/season-shelf/releases/latest"),handle,notify,settings:()=>settings,saveSettings:()=>store.set("settings",settings),busy:()=>watcher.checking || queue.running.size || queue.namingLocks.size || scanning || !!discovery.operation || !!authPrompt || adapter.connecting,beforeInstall:async()=>{watcher.stop();await queue.stop();await adapter.disconnect();quitting=true;}});
     await win.loadFile(uiFile);
     if (runtime.liveReload) {

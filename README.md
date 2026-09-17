@@ -3,14 +3,27 @@
 <p align="center">
   <a href="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml"><img src="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml/badge.svg" alt="Windows and macOS CI"></a>
   <img src="https://img.shields.io/badge/build_targets-Windows%20%7C%20macOS-357EC7?style=flat-square" alt="Windows and macOS build targets">
-  <img src="https://img.shields.io/badge/status-in_development-A0E4C6?style=flat-square" alt="In development">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-A0E4C6?style=flat-square" alt="MIT License"></a>
 </p>
 
-<p align="center"><a href="#get-started">Get started</a> &middot; <a href="README.md#build-and-release">Release setup</a> &middot; <a href="docs/ROADMAP.md">Roadmap</a> &middot; <a href="CONTRIBUTING.md">Contribute</a></p>
+<p align="center"><a href="#get-started"><strong>Get started</strong></a> &nbsp; | &nbsp; <a href="#build-and-release">Build &amp; release</a> &nbsp; | &nbsp; <a href="docs/ROADMAP.md">Roadmap</a> &nbsp; | &nbsp; <a href="CONTRIBUTING.md">Contribute</a></p>
 
 **Download episodes from Telegram and organise them into season folders.** Choose a series, pick your quality and manage your collection from one desktop app.
 
 ![Season Shelf series library with illustrative sample data](docs/assets/library-preview.png)
+
+<details>
+<summary>Contents</summary>
+
+- [Get started](#get-started)
+- [Your files and data](#your-files-and-data)
+- [Build and release](#build-and-release)
+- [Known limitations](#know-the-limits)
+- [Contribute](CONTRIBUTING.md)
+- [Built on vibes](#built-on-vibes)
+- [License](#license-and-acknowledgements)
+
+</details>
 
 ## 📺 Your collection, organised
 
@@ -30,7 +43,16 @@ Download and Watch folders keep permanent and viewing copies separate. You decid
 
 ## 🚀 Get started
 
-> **In development:** production installers are not published yet. Windows and macOS build workflows are configured; installation and update acceptance are still pending.
+**Install the app**
+
+Download a published installer from [GitHub Releases](https://github.com/Harshana-Rathnayaka/season-shelf/releases):
+
+- **Windows:** run the `.exe` installer. Future updates download inside the app.
+- **macOS:** open the universal `.dmg` and drag Season Shelf into Applications. Updates are installed manually.
+
+Installers are unsigned, so your operating system may show a security warning. If no release is listed yet, the first build is still on its way.
+
+**Run from source**
 
 Install Node.js 24 or later and Git, then clone the project:
 
@@ -62,6 +84,8 @@ Missing a channel? Select **All channels** or adjust **Settings > Channel filter
 Use `npm start` for a normal source launch or `npm run dev` for automatic reload. In VS Code, press **F5** and select **Electron: Development** after installing dependencies. Use `npm.cmd` in PowerShell if its execution policy blocks `npm`. See [Contributing](CONTRIBUTING.md#develop-locally) for debugging. Build local installers using the commands in [Desktop releases](README.md#build-and-release).
 
 Just exploring? Open the [sample preview](docs/preview.html) locally. It uses sample data and never connects to your account.
+
+<a id="your-files-and-data"></a>
 
 ## 🔒 Your files and data
 
@@ -122,6 +146,12 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The app uses Electron, plain Java
 | `test/` | Regression tests |
 
 [Contribution and development guide](CONTRIBUTING.md) · [Release setup](README.md#build-and-release)
+
+<a id="built-on-vibes"></a>
+
+## ✨ Built on vibes
+
+Entirely vibe-coded with **Astra in Codex**. Human ideas, AI-written code, and plenty of "why is this doing that?" moments. Proudly built in the open.
 
 ## License and acknowledgements
 

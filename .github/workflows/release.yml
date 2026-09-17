@@ -29,7 +29,14 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" --json isDraft > release-state.json; then
             node -e 'if (!require("./release-state.json").isDraft) throw Error("Never overwrite a published release; create a new version")'
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Season Shelf $GITHUB_REF_NAME" --generate-notes
+            if [ "$GITHUB_REF_NAME" = "v1.0.0" ]; then
+              gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Season Shelf 1.0.0 — First release" --notes-file .github/release-notes/1.0.0.md
+            else
+              gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Season Shelf $GITHUB_REF_NAME" --generate-notes
+            fi
+          fi
+          if [ "$GITHUB_REF_NAME" = "v1.0.0" ]; then
+            gh release edit "$GITHUB_REF_NAME" --notes-file .github/release-notes/1.0.0.md
           fi
   build:
     needs: prepare

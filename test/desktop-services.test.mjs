@@ -157,3 +157,11 @@ test('update checks persist their timestamp and reject duplicate clicks while pe
   updater.emit('update-not-available');finish();await pending;
   assert.equal(handlers['update-status']().state,'current');
 });
+
+test('development close pauses work without creating a tray or hiding the window',async()=>{
+  let pauses=0;const win=new EventEmitter();
+  const {installTray}=await load('src/desktop/tray.cjs',{Tray:class{constructor(){throw Error('No development tray');}}});
+  assert.equal(installTray({enabled:false,win,queue:{controlAll:action=>{assert.equal(action,'pause');pauses++;}},isQuitting:()=>false}),null);
+  win.emit('close',{preventDefault(){throw Error('Close must proceed');}});
+  assert.equal(pauses,1);
+});

@@ -63,8 +63,12 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
-      - name: Build unsigned assets and upload to the draft
-        run: npm run release:${{ matrix.target }} -- --config.publish.releaseType=draft
+      - name: Build unsigned assets
+        run: npm run pack:${{ matrix.target }}
+      - name: Upload assets with retries
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/upload-release.mjs
   publish:
     needs: [prepare, build]
     runs-on: ubuntu-latest

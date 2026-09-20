@@ -1,7 +1,7 @@
 {
   "name": "season-shelf",
   "productName": "Season Shelf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A local desktop companion for organising episodic Telegram downloads.",
   "private": true,
   "type": "module",

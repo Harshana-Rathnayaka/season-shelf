@@ -1,4 +1,4 @@
-﻿<p align="center"><img src="docs/assets/readme-banner.svg" alt="Season Shelf — Your series, beautifully organised" width="100%"></p>
+<p align="center"><img src="docs/assets/readme-banner.svg" alt="Season Shelf — Your series, beautifully organised" width="100%"></p>
 
 <p align="center">
   <a href="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml"><img src="https://github.com/Harshana-Rathnayaka/season-shelf/actions/workflows/ci.yml/badge.svg" alt="Windows and macOS CI"></a>
@@ -112,7 +112,7 @@ Builds are unsigned. Windows may show security warnings; macOS may require appro
 
 **Windows updates:** the installed app checks GitHub at startup, daily and from Settings, downloads newer versions, then offers **Restart and install**. The installer opens automatically and upgrades the existing app. No manual GitHub download or uninstall is needed. **Not now** keeps the update for installation on a later launch after verification. Active work blocks installation. Settings, login, history and downloaded media are preserved.
 
-**Windows uninstall (next release):** uninstalling removes the installed app's settings, login, onboarding progress, library, download history, lifetime totals, cache and managed partial downloads. Completed media stays in your download folders. Installing again starts with onboarding and an empty library and queue; existing media is not automatically imported. Installing an update without uninstalling preserves your data. Development profiles are separate and are not removed. The original 1.0.0 uninstaller retains app data; this cleanup takes effect after installing a version containing the change. On macOS, moving the app to the Trash does not remove its separate application data.
+**Windows uninstall (1.0.1 and later):** uninstalling removes the installed app's settings, login, onboarding progress, library, download history, lifetime totals, cache and managed partial downloads. Completed media stays in your download folders. Installing again starts with onboarding and an empty library and queue; existing media is not automatically imported. Installing an update without uninstalling preserves your data. Development profiles are separate and are not removed. The original 1.0.0 uninstaller retains app data; this cleanup takes effect after installing 1.0.1 or later. On macOS, moving the app to the Trash does not remove its separate application data.
 
 **macOS updates:** Settings opens GitHub Releases. Download the new DMG, quit the app and replace Season Shelf in Applications. App data is stored separately and retained. Automatic installation is disabled for unsigned Mac builds.
 

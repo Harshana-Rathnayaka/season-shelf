@@ -125,6 +125,32 @@ test('unsigned release config keeps updater identity and disables certificate re
   assert.equal(await updater.verifySignature('unused.exe'),null);
 });
 
+test('Windows uninstall cleanup is update-guarded and restricted to installed app data',async()=>{
+  const {build}=require('../package.json');
+  assert.equal(build.nsis.include,'build/installer.nsh');
+  // The built-in cleanup also deletes the development profile by package name.
+  assert.equal(build.nsis.deleteAppDataOnUninstall,false);
+  const hook=await fs.readFile(build.nsis.include,'utf8');
+  const commands=hook.split(/\r?\n/).map(line=>line.trim()).filter(line=>line&&!line.startsWith(';'));
+  assert.deepEqual(commands,[
+    '!macro customUnInstall',
+    '${ifNot} ${isUpdated}',
+    'SetShellVarContext current',
+    'RMDir /r "$APPDATA\\Season Shelf\\installed"',
+    'RMDir /r "$LOCALAPPDATA\\season-shelf-updater"',
+    'RMDir "$APPDATA\\Season Shelf"',
+    '${if} $installMode == "all"',
+    'SetShellVarContext all',
+    '${endif}',
+    '${endif}',
+    '!macroend',
+  ]);
+  const main=await fs.readFile('src/desktop/main.cjs','utf8');
+  assert.match(main,/staging: path\.join\(app\.getPath\("userData"\), "staging"\)/);
+  const profile=await fs.readFile('src/desktop/profile.cjs','utf8');
+  assert.match(profile,/path\.join\(app\.getPath\('appData'\), 'Season Shelf', 'installed'\)/);
+});
+
 test('Windows startup and daily checks download in-app, then restart invokes the installer',async()=>{
   const scheduled=[];const updater=new EventEmitter();let downloads=0;let launched;
   updater.checkForUpdates=async()=>updater.emit('update-available',{version:'1.0.1'});

@@ -58,6 +58,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
+      "include": "build/installer.nsh",
       "deleteAppDataOnUninstall": false
     },
     "mac": {

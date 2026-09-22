@@ -1,0 +1,61 @@
+@media (max-width: 1190px) {
+  .sidebar {
+    width: 196px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .main-shell {
+    margin-left: 196px;
+    width: calc(100% - 196px);
+  }
+  main {
+    padding: 25px;
+  }
+  .topbar {
+    padding: 0 25px;
+  }
+  .mode-card {
+    padding: 16px 12px;
+    gap: 10px;
+  }
+  .mode-icon {
+    width: 32px;
+    height: 36px;
+  }
+  .mode-copy strong {
+    font-size:calc(14px * var(--font-scale, 1));
+  }
+  .mode-copy .tag {
+    display: table;
+    margin: 5px 0;
+  }
+  .mode-copy small {
+    font-size:calc(11px * var(--font-scale, 1));
+  }
+  .season-tabs {
+    gap: 13px;
+  }
+  .season-tab {
+    font-size:calc(12px * var(--font-scale, 1));
+  }
+  .table-search {
+    width: 130px;
+  }
+  .destination-hint {
+    display: none;
+  }
+  .orbit-art {
+    margin-right: 0;
+  }
+  .app-footer {
+    padding-left: 25px;
+    padding-right: 25px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+

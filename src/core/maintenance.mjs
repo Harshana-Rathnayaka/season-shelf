@@ -6,12 +6,13 @@ export function pendingEntries(queue) {
   return queue.jobs.filter(job => ["queued", "downloading", "paused", "retrying", "failed", "waiting", "cancelled"].includes(job.status));
 }
 
-export function removePending(queue, ids) {
+export async function removePending(queue, ids) {
   const eligible = new Set(pendingEntries(queue).map(job => job.id));
   let removed = 0;
   queue.batching = true;
   try {
-    for (const id of ids) if (eligible.has(id)) { queue.control(id, "remove"); removed++; }
+    for (const id of ids) if (eligible.has(id)) queue.control(id, "pause");
+    for (const id of ids) if (eligible.has(id)) { await queue.control(id, "remove"); removed++; }
   } finally { queue.batching = false; queue.pump(); }
   return removed;
 }

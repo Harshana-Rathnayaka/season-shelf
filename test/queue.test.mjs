@@ -8,6 +8,7 @@ import { Store } from "../src/core/store.mjs";
 import { DownloadQueue } from "../src/core/queue.mjs";
 import { registerRoot, hashFile, publishFile } from "../src/core/files.mjs";
 import { parseEpisode } from "../src/core/catalog.mjs";
+import { trashCompleted, removePending } from "../src/core/maintenance.mjs";
 const chunkSize = 524288;
 async function fixture(t, { size = chunkSize * 3 + 71, slow = false } = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "shelf-test-"));
@@ -55,6 +56,87 @@ async function settle(queue) {
     await delay(10);
   }
 }
+
+test('network slots refill during disk finishing, with bounded backlog and graceful shutdown', async t => {
+  const f = await fixture(t, {size: 1024});
+  f.queue.concurrency = 1;
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const finish = f.queue.finishDownload.bind(f.queue);
+  let finishing = 0;
+  f.queue.finishDownload = async (...args) => {
+    finishing++;
+    await gate;
+    return finish(...args);
+  };
+  const items = [1,2,3].map(n => ({...f.item,id:String(n),episode:n,filename:`Show.S01E0${n}.720p.x265.mkv`}));
+  try {
+    await f.queue.add({items,series:'Show',mode:'archive',root:f.root});
+    const deadline = Date.now() + 5000;
+    while (f.queue.jobs[1].status !== 'checking') {
+      assert.ok(Date.now() < deadline, 'second download starts while first is finishing');
+      await delay(10);
+    }
+    assert.equal(f.offsets.length, 2);
+    assert.equal(finishing, 1, 'disk finishing is serialized');
+    assert.equal(f.queue.jobs[2].status, 'queued', 'slow disk backlog is bounded');
+    let stopped = false;
+    const stop = f.queue.stop().then(() => { stopped = true; });
+    await delay(20);
+    assert.equal(stopped, false, 'shutdown waits for disk work');
+    release();
+    await stop;
+    assert.deepEqual(f.queue.jobs.map(job => job.status), ['complete','complete','paused']);
+    assert.equal(f.queue.running.size, 0);
+    assert.equal(f.queue.downloading.size, 0);
+  } finally { release(); }
+});
+
+test('a failed disk finish does not block later downloads or finishing work', async t => {
+  const f = await fixture(t, {size: 1024});
+  f.queue.concurrency = 1;
+  const finish = f.queue.finishDownload.bind(f.queue);
+  f.queue.finishDownload = async (job, partial) => {
+    if (job.item.id === '1') throw new Error('Disk transfer failed');
+    return finish(job, partial);
+  };
+  await f.queue.add({items:[f.item,{...f.item,id:'2',episode:2,filename:'Show.S01E02.720p.x265.mkv'}],series:'Show',mode:'archive',root:f.root});
+  await settle(f.queue);
+  assert.deepEqual(f.queue.jobs.map(job => job.status), ['failed','complete']);
+  assert.equal(f.queue.downloading.size, 0);
+  assert.deepEqual(await fs.readFile(f.queue.jobs[1].finalPath), f.data);
+});
+
+test('removing completed history persists removal and leaves downloaded bytes intact', async t => {
+  const f = await fixture(t, {size:1024});
+  await f.queue.add({items:[f.item],series:'Show',mode:'archive',root:f.root});
+  await settle(f.queue);
+  const {id,finalPath} = f.queue.jobs[0];
+  const usage = structuredClone(f.queue.usage);
+  assert.equal(usage.payloadBytes, 1024);
+  assert.equal(usage.publishedBytes, 1024);
+  await f.queue.control(id,'remove');
+  assert.deepEqual(f.queue.snapshot(),[]);
+  assert.deepEqual(f.store.get('jobs'),[]);
+  assert.deepEqual(await fs.readFile(finalPath),f.data);
+  assert.deepEqual(f.queue.usage,usage);
+  assert.deepEqual(f.store.get('usage'),usage);
+});
+
+test('deleting a finished disk file preserves persisted lifetime network and download totals', async t => {
+  const f = await fixture(t, {size:1024});
+  await f.queue.add({items:[f.item],series:'Show',mode:'archive',root:f.root});
+  await settle(f.queue);
+  const job = f.queue.jobs[0];
+  const usage = structuredClone(f.queue.usage);
+  assert.equal(usage.payloadBytes,1024);
+  assert.equal(usage.publishedBytes,1024);
+  const result = await trashCompleted(f.queue,[job.id],file => fs.rename(file,file+'.recycled'));
+  assert.equal(result.deleted,1);
+  assert.equal(job.status,'deleted');
+  assert.deepEqual(f.queue.usage,usage);
+  assert.deepEqual(f.store.get('usage'),usage);
+});
 
 test('unverified files download exact bytes into a separate folder and retain the source name',async t=>{
   const {queue,root,item,data}=await fixture(t);
@@ -242,7 +324,7 @@ test("bulk pause, cancel and resume affect unfinished jobs and removal persists"
   f.queue.controlAll("resume");
   assert.ok(f.queue.jobs.every(j => j.status === "queued"));
   const id = f.queue.jobs[0].id;
-  f.queue.control(id, "remove");
+  await f.queue.control(id, "remove");
   assert.equal(f.queue.jobs.length, 1);
   assert.equal(f.store.get("jobs", []).length, 1);
   assert.notEqual(f.store.get("jobs", [])[0].id, id);
@@ -257,12 +339,34 @@ test("remove aborts an active download without publishing or restoring its queue
     assert.ok(Date.now()<deadline);
     await delay(5);
   }
-  f.queue.control(job.id,"remove");
+  await f.queue.control(job.id,"remove");
   await settle(f.queue);
   assert.equal(f.queue.jobs.length,0);
   assert.deepEqual(f.store.get("jobs",[]),[]);
-  assert.ok((await fs.stat(path.join(f.queue.staging,job.id+".part"))).size > 0);
+  await assert.rejects(fs.stat(path.join(f.queue.staging,job.id+".part")), {code:"ENOENT"});
   assert.equal(job.finalPath,undefined);
+});
+
+test('clear queue deletes staged and failed transfer data while preserving completed files and lifetime totals', async t => {
+  const f=await fixture(t,{size:1024});
+  await f.queue.add({items:[f.item],series:'Show',mode:'archive',root:f.root});
+  await settle(f.queue);
+  const completed=f.queue.jobs[0];
+  const usage=structuredClone(f.queue.usage);
+  f.queue.concurrency=0;
+  await f.queue.add({items:[{...f.item,id:'2',episode:2,filename:'Show.S01E02.720p.x265.mkv'}],series:'Show',mode:'archive',root:f.root});
+  const pending=f.queue.jobs[1];
+  pending.status='failed';
+  const partial=path.join(f.queue.staging,`${pending.id}.part`);
+  const transfer=path.join(path.dirname(path.join(f.root.path,...pending.parts)),`.season-shelf-${pending.id}.transfer`);
+  await fs.writeFile(partial,'partial bytes');
+  await fs.writeFile(transfer,'incomplete destination copy');
+  assert.equal(await removePending(f.queue,[completed.id,pending.id]),1);
+  await assert.rejects(fs.stat(partial),{code:'ENOENT'});
+  await assert.rejects(fs.stat(transfer),{code:'ENOENT'});
+  assert.deepEqual(await fs.readFile(completed.finalPath),f.data);
+  assert.deepEqual(f.queue.jobs.map(job=>job.id),[completed.id]);
+  assert.deepEqual(f.store.get('usage'),usage);
 });
 
 test("season keeps originals while incomplete, then normalizes minority names exactly", async (t) => {

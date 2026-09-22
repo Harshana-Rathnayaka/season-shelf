@@ -2,7 +2,8 @@ import { parseEpisode } from "../src/core/catalog.mjs";
 // DOM logic tests only; JSDOM is not a browser and does not validate layout.
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs/promises";
+import { rendererSource } from "../scripts/lib/renderer-source.mjs";
+const rendererCode = await rendererSource();
 import { JSDOM } from "jsdom";
 async function fixture(t, bootstrap = null, handler = null) {
   const dom = new JSDOM(
@@ -24,25 +25,7 @@ async function fixture(t, bootstrap = null, handler = null) {
   window.HTMLDialogElement.prototype.close = function () {
     this.open = false;
   };
-  const files = [
-    "src/ui/icons.mjs",
-    "src/ui/discovery-flow.mjs",
-    "src/core/appearance.mjs",
-    "src/ui/appearance.mjs",
-    "src/core/catalog.mjs",
-    "src/core/collection.mjs",
-    "src/core/progress.mjs",
-    "src/ui/demo.mjs",
-    "src/ui/app.mjs",
-  ];
-  const code = (
-    await Promise.all(files.map((file) => fs.readFile(file, "utf8")))
-  )
-    .map((text) =>
-      text.replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""),
-    )
-    .join("\n");
-  await window.eval(`(async () => {${code}\n})()`);
+  await window.eval(rendererCode);
   t.after(() => window.close());
   const click = (selector) => {
     const element = window.document.querySelector(selector);
@@ -100,12 +83,17 @@ test("queue totals update for cancel, resume and removal; help is reachable", as
   const f=await fixture(t);
   f.click('[data-action="download"]');
   const summary=()=>f.document.querySelector('.queue-summary').textContent;
+  assert.equal(f.document.querySelector('[data-control="cancel"]'),null);
+  assert.equal(f.document.querySelector('[data-action="bulk-job"][data-control="pause"]').disabled,false);
+  assert.equal(f.document.querySelector('[data-action="bulk-job"][data-control="resume"]').disabled,true);
+  assert.equal(f.document.querySelector('[data-action="delete-all-queue"]').textContent.trim(),'Clear queue…');
   const initial=summary();
   assert.match(initial,/CURRENT BATCH/);
   f.click('[data-action="bulk-job"][data-control="pause"]');
   assert.equal(f.document.querySelector('.status').textContent,'paused');
-  f.click('[data-action="bulk-job"][data-control="cancel"]');
-  assert.match(summary(),/0.0 MB \/ 0.0 MB/);
+  assert.equal(f.document.querySelector('[data-action="bulk-job"][data-control="pause"]').disabled,true);
+  assert.equal(f.document.querySelector('[data-action="bulk-job"][data-control="resume"]').disabled,false);
+
   f.click('[data-action="bulk-job"][data-control="resume"]');
   assert.equal(summary(),initial);
   f.click('[data-action="job"][data-control="remove"]');
@@ -188,7 +176,8 @@ test("saved files show actual basename and expose original name and real path in
   const item=parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:100});
   const finalPath='C:/Shows/Old Show/Season 01/Old Show - S01E01 - 720p HEVC.mkv';
   const f=await fixture(t,{jobs:[{id:'job1',series:'Show',item,status:'complete',received:100,mode:'archive',finalPath}]});
-  f.click('[data-action="nav"][data-page="saved"]');
+  f.click('[data-page="queue"]');
+  f.click('[data-action="download-tab"][data-tab="finished"]');
   assert.equal(f.document.querySelector('.queue-filename').textContent,'Old Show - S01E01 - 720p HEVC.mkv');
   assert.equal(f.document.querySelector('.job-path'),null);
   f.click('[data-action="file-details"]');
@@ -213,7 +202,9 @@ test("keyword editor saves user terms and archive files offer Recycle Bin deleti
   assert.match(f.document.querySelector('#hidden-keywords').value,/signals/);
   const item=parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:100});
   const live=await fixture(t,{jobs:[{id:'1',item,series:'Show',status:'complete',mode:'archive',finalPath:'C:/Show/file.mkv'}]});
-  live.click('[data-action="nav"][data-page="saved"]');
+  live.click('[data-page="queue"]');
+  live.click('[data-action="download-tab"][data-tab="finished"]');
+  live.click('[data-action="file-details"]');
   live.click('[data-action="delete-job"]');
   assert.equal(live.calls.find(c=>c.method==='delete-job').payload.id,'1');
 });
@@ -307,7 +298,7 @@ test("discovery failures replace the waiting overlay with an actionable visible 
 
 test("all pages keep their heading outside the scroll pane and retain position on updates", async (t) => {
   const f=await fixture(t);
-  for (const page of ['queue','saved','settings','help']) {
+  for (const page of ['queue','settings','help']) {
     f.click('[data-page="'+page+'"]');
     const pane=f.document.querySelector('.workspace-scroll');
     const heading=f.document.querySelector('.simple-heading');
@@ -349,9 +340,68 @@ test('unverified files are selectable in the library without entering the verifi
   assert.deepEqual(Array.from(f.calls.find(call=>call.method==='enqueue').payload.unverifiedIds),['42']);
 });
 
+test('downloads group active and queued work first; saved files show newest completions first',async t=>{
+  const job=(id,status,createdAt,completedAt)=>({id,series:'Show',status,createdAt,completedAt,mode:'archive',item:{filename:id,size:100,season:1,episode:1}});
+  const jobs=[
+    job('old-completion','complete','2026-01-09','2026-01-10'),
+    job('queued-old','queued','2026-01-01'),
+    job('paused','paused','2026-01-12'),
+    job('active','downloading','2026-01-02'),
+    job('new-completion','complete','2026-01-01','2026-01-11'),
+    job('queued-new','queued','2026-01-03'),
+    job('checking','checking','2026-01-04'),
+    job('legacy','complete','2025-12-01'),
+    job('undated','complete','invalid'),
+    job('deleted','deleted','2026-01-13'),
+    job('missing','missing','2026-01-13'),
+  ];
+  const originalOrder=jobs.map(job=>job.id);
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs});
+  const filenames=()=>Array.from(f.document.querySelectorAll('.queue-filename'),element=>element.textContent);
+  f.click('[data-page="queue"]');
+  assert.deepEqual(filenames(),['checking','active','queued-new','queued-old','paused']);
+  f.click('[data-page="queue"]');
+  f.click('[data-action="download-tab"][data-tab="finished"]');
+  assert.deepEqual(filenames(),['new-completion','old-completion','legacy','undated']);
+  assert.deepEqual(jobs.map(job=>job.id),originalOrder);
+});
+
+test('Finished removes history separately from disk deletion and Downloads defaults to Ongoing',async t=>{
+  const item=parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:100});
+  const f=await fixture(t,{jobs:[{id:'done',series:'Show',item,status:'complete',mode:'archive',finalPath:'C:/Show/file.mkv'}]},async()=>[]);
+  f.click('[data-page="queue"]');
+  assert.equal(f.document.querySelectorAll('.queue-item').length,0);
+  assert.equal(f.document.querySelector('[data-page="saved"]'),null);
+  f.click('[data-action="download-tab"][data-tab="finished"]');
+  assert.equal(f.document.querySelectorAll('.queue-item').length,1);
+  assert.equal(f.document.querySelector('.queue-item [data-action="delete-job"]'),null);
+  f.click('.queue-item [data-action="remove-history"]');
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.deepEqual(f.calls.filter(c=>c.method==='remove-history').map(c=>c.payload.id),['done']);
+  assert.equal(f.calls.some(c=>c.method==='delete-job'),false);
+  assert.equal(f.document.querySelectorAll('.queue-item').length,0);
+  f.click('[data-page="library"]');
+  f.click('[data-page="queue"]');
+  assert.equal(f.document.querySelector('[data-tab="ongoing"]').getAttribute('aria-pressed'),'true');
+});
+
+test('completed live downloads move from Ongoing into Finished',async t=>{
+  const item=parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:100});
+  const job={id:'live',series:'Show',item,status:'downloading',mode:'archive'};
+  const f=await fixture(t,{jobs:[job]});
+  f.click('[data-page="queue"]');
+  assert.equal(f.document.querySelectorAll('.queue-item').length,1);
+  f.emit({type:'queue',data:[{...job,status:'complete',finalPath:'C:/Show/file.mkv'}]});
+  assert.equal(f.document.querySelectorAll('.queue-item').length,0);
+  f.click('[data-action="download-tab"][data-tab="finished"]');
+  assert.equal(f.document.querySelectorAll('.queue-item').length,1);
+  assert.equal(f.document.querySelector('.queue-filename').textContent,'file.mkv');
+});
+
 test('saved files hide deleted and missing history and show an empty state',async t=>{
   const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[{status:'deleted'},{status:'missing'}]});
-  f.click('[data-page="saved"]');
+  f.click('[data-page="queue"]');
+  f.click('[data-action="download-tab"][data-tab="finished"]');
   assert.equal(f.document.querySelectorAll('.queue-item').length,0);
   assert.ok(f.document.querySelector('.empty-state'));
 });

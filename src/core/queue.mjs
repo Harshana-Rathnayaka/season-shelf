@@ -12,7 +12,10 @@ export class DownloadQueue extends EventEmitter {
     super();
     Object.assign(this, { store, adapter, staging, concurrency });
     this.running = new Map();
+    this.downloading = new Set();
+    this.finishing = Promise.resolve();
     this.tasks = new Map();
+    this.removals = new Map();
     this.namingLocks = new Set();
     this.usage = store.get("usage", { since: new Date().toISOString(), payloadBytes: 0, publishedBytes: 0, completedFiles: 0 });
     this.jobs = store
@@ -21,7 +24,7 @@ export class DownloadQueue extends EventEmitter {
         ...job,
         speed: 0,
         status:
-          activeStates.has(job.status) ||
+          activeStates.has(job.status) || job.status === "removing" ||
           job.status === "queued" ||
           job.status === "retrying"
             ? "paused"
@@ -166,13 +169,16 @@ export class DownloadQueue extends EventEmitter {
   control(id, action) {
     const job = this.jobs.find((job) => job.id === id);
     if (!job) throw new Error("Download not found");
+    if (this.removals.has(id)) {
+      if (action === "remove") return this.removals.get(id);
+      throw new Error("Temporary data is being removed; please wait");
+    }
     if (action === "remove") {
-      if (["checking", "transferring"].includes(job.status))
+      if (["checking", "transferring"].includes(job.status) ||
+          (this.running.has(id) && job.status === "complete") ||
+          job.renamePending || this.namingLocks.has(this.seasonKey(job)))
         throw new Error("Finishing the verified transfer; please wait");
-      this.running.get(id)?.abort();
-      job.status = "removed";
-      this.jobs = this.jobs.filter((entry) => entry.id !== id);
-      // Retain partial bytes; removing a queue entry never deletes media.
+      return this.remove(job);
     } else if (action === "resume") {
       if (this.running.has(id))
         throw new Error("Wait for the current operation to stop");
@@ -199,6 +205,38 @@ export class DownloadQueue extends EventEmitter {
     this.save();
     this.pump();
   }
+  remove(job) {
+    if (this.removals.has(job.id)) return this.removals.get(job.id);
+    const completed = job.status === "complete";
+    job.status = "removing";
+    this.running.get(job.id)?.abort();
+    this.save();
+    const task = (async () => {
+      try {
+        // Wait for the staging writer to close before deleting on Windows.
+        await this.tasks.get(job.id);
+        const partial = path.resolve(this.staging, `${job.id}.part`);
+        if (!partial.startsWith(path.resolve(this.staging) + path.sep))
+          throw new Error("Unsafe staging-file destination");
+        await fs.rm(partial, {force:true});
+        const destination = path.resolve(job.root.path, ...job.parts);
+        if (!destination.startsWith(path.resolve(job.root.path) + path.sep))
+          throw new Error("Unsafe temporary-file destination");
+        await fs.rm(path.join(path.dirname(destination), `.season-shelf-${job.id}.transfer`), {force:true});
+        this.jobs = this.jobs.filter(entry => entry.id !== job.id);
+      } catch (error) {
+        job.status = completed ? "complete" : "failed";
+        job.error = `Could not remove temporary data: ${error.message}`;
+        throw error;
+      } finally {
+        this.removals.delete(job.id);
+        this.save();
+        this.pump();
+      }
+    })();
+    this.removals.set(job.id, task);
+    return task;
+  }
   pump() {
     if (this.adapter.transferPolicy && !this.adapter.transferPolicy.allowed()) {
       if(this.jobs.some(job=>job.speed)) {this.jobs.forEach(job=>{job.speed=0;});this.save();}
@@ -208,12 +246,15 @@ export class DownloadQueue extends EventEmitter {
     for (const job of this.jobs) {
       if (job.status === "retrying" && Date.now() >= job.retryAt)
         job.status = "queued";
-      if (this.running.size >= this.concurrency) break;
+      // Bound staged work when the destination is slower than the network.
+      if (this.downloading.size >= this.concurrency || this.running.size >= this.concurrency * 2) break;
       if (job.status !== "queued" || this.running.has(job.id)) continue;
       const controller = new AbortController();
       this.running.set(job.id, controller);
+      this.downloading.add(job.id);
       const task = this.run(job, controller.signal).finally(() => {
         this.running.delete(job.id);
+        this.downloading.delete(job.id);
         this.tasks.delete(job.id);
         this.pump();
       });
@@ -310,29 +351,21 @@ export class DownloadQueue extends EventEmitter {
       if (signal.aborted) throw new Error("Aborted");
       if ((await fs.stat(partial)).size !== job.item.size)
         throw new Error("Download ended before expected size");
+      if (signal.aborted) throw new Error("Aborted");
       job.status = "checking";
       job.speed = 0;
       this.save();
-      job.sha256 = await hashFile(partial);
-      job.status = "transferring";
-      this.save();
-      job.finalPath = await publishFile({
-        source: partial,
-        root: job.root,
-        parts: job.parts,
-        id: job.id,
-        expectedHash: job.sha256,
-      });
-      job.status = "complete";
-      this.usage.publishedBytes += job.item.size;
-      this.usage.completedFiles++;
-      job.completedAt = new Date().toISOString();
-      this.save();
-      await fs.rm(partial, { force: true });
-      await this.finishSeason(job);
+      // Keep lifecycle tracking until publication completes, but release the
+      // network slot now. Serialize disk work and retain at most one extra
+      // batch of staged files through pump's total-work bound.
+      const finishing = this.finishing.then(() => this.finishDownload(job, partial));
+      this.finishing = finishing.catch(() => {});
+      this.downloading.delete(job.id);
+      this.pump();
+      await finishing;
     } catch (error) {
       if (signal.aborted) {
-        if (!["cancelled", "paused"].includes(job.status))
+        if (!["cancelled", "paused", "removing"].includes(job.status))
           job.status = "paused";
       } else if (job.status === "complete") {
         job.error = "Saved successfully; staged copy could not be removed";
@@ -361,6 +394,25 @@ export class DownloadQueue extends EventEmitter {
       await handle?.close();
     }
   }
+  async finishDownload(job, partial) {
+    job.sha256 = await hashFile(partial);
+    job.status = "transferring";
+    this.save();
+    job.finalPath = await publishFile({
+      source: partial,
+      root: job.root,
+      parts: job.parts,
+      id: job.id,
+      expectedHash: job.sha256,
+    });
+    job.status = "complete";
+    this.usage.publishedBytes += job.item.size;
+    this.usage.completedFiles++;
+    job.completedAt = new Date().toISOString();
+    this.save();
+    await fs.rm(partial, { force: true });
+    await this.finishSeason(job);
+  }
   async stop() {
     this.stopped = true;
     clearInterval(this.timer);
@@ -380,5 +432,6 @@ export class DownloadQueue extends EventEmitter {
     this.save();
     await this.recovery;
     await Promise.allSettled([...this.tasks.values()]);
+    await Promise.allSettled([...this.removals.values()]);
   }
 }

@@ -7,10 +7,10 @@ import {randomUUID} from "node:crypto";
 import {hashFile} from "../src/core/files.mjs";
 import {removePending, trashCompleted, orphanedPartials, trashOrphans} from "../src/core/maintenance.mjs";
 
-test("bulk queue removal keeps completed and finishing entries", () => {
+test("bulk queue removal keeps completed and finishing entries", async () => {
   const queue = {jobs:[{id:"1",status:"downloading"},{id:"2",status:"complete"},{id:"3",status:"transferring"}],
-    control(id,action){assert.equal(this.batching,true);assert.equal(action,"remove");this.jobs=this.jobs.filter(j=>j.id!==id);},pump(){}};
-  assert.equal(removePending(queue,["1","2","3"]),1);
+    control(id,action){assert.equal(this.batching,true);if(action === "remove") this.jobs=this.jobs.filter(j=>j.id!==id);},pump(){}};
+  assert.equal(await removePending(queue,["1","2","3"]),1);
   assert.deepEqual(queue.jobs.map(j=>j.id),["2","3"]);
 });
 

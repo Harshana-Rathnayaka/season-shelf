@@ -46,7 +46,7 @@ app
     const [
       { Store },
       { DownloadQueue },
-      { registerRoot, hashFile },
+      { registerRoot },
       { TelegramAdapter },
       { selectEpisodes, defaultHiddenKeywords, cleanKeywords },
     ] = await Promise.all([
@@ -56,7 +56,6 @@ app
       import("./telegram.mjs"),
       import("../core/catalog.mjs"),
     ]);
-    const {pendingEntries, removePending, trashCompleted, orphanedPartials, trashOrphans} = await import("../core/maintenance.mjs");
     const {cleanAppearance} = await import("../core/appearance.mjs");
     await fs.mkdir(app.getPath("userData"), {recursive:true});
     store = new Store(path.join(app.getPath("userData"), "shelf.sqlite"));
@@ -336,98 +335,8 @@ app
       if (!items.length) throw new Error("No matching episodes selected");
       return queue.add({ items, series: catalogue.channel.title, mode, root });
     });
-    handle("queue-control", ({ id, action, all }) => {
-      if (action === "resume") adapter.requireClient();
-      if (all) queue.controlAll(action);
-      else queue.control(id, action);
-      return queue.snapshot();
-    });
-    handle("open-job", async ({ id }) => {
-      const job = queue.jobs.find(
-        (j) => j.id === id && j.status === "complete",
-      );
-      if (!job) throw new Error("Completed download not found");
-      await fs.access(job.finalPath);
-      const error = await shell.openPath(job.finalPath);
-      if (error) throw new Error(error);
-    });
-    handle("reveal-job", async ({ id }) => {
-      const job = queue.jobs.find(j => j.id === id && j.status === "complete");
-      if (!job?.finalPath) throw new Error("Completed download not found");
-      await fs.access(job.finalPath);
-      shell.showItemInFolder(job.finalPath);
-    });
-    handle("delete-job", async ({ id }) => {
-      const job = queue.jobs.find(
-        (j) => j.id === id && j.status === "complete",
-      );
-      if (!job)
-        throw new Error("Only completed downloads can be deleted here");
-      if (queue.namingLocks.has(queue.seasonKey(job)) || job.renamePending)
-        throw new Error("Season filenames are being finalized; try again shortly");
-      const result = await confirmInApp({
-        type: "question",
-        title: "Delete downloaded file?",
-        message: `Move ${path.basename(job.finalPath)} to the Recycle Bin?`,
-        detail: `This ${job.mode === "archive" ? "archive" : "viewing"} file will be moved to the Recycle Bin.`,
-        buttons: ["Keep file", "Move to Recycle Bin"],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      if (result.response !== 1) return queue.snapshot();
-      const outcome = await trashCompleted(queue, [id], file => shell.trashItem(file));
-      if (outcome.failures.length) throw new Error(outcome.failures[0].error);
-      return queue.snapshot();
-    });
-    handle("delete-all-queue", async () => {
-      const ids = pendingEntries(queue).map(job => job.id);
-      if (!ids.length) return {jobs:queue.snapshot(),removed:0};
-      const result = await confirmInApp({
-        type:"question", title:"Delete all pending queue entries?",
-        message:`Remove ${ids.length} unfinished queue entries?`,
-        detail:"Downloads will stop. Completed files and retained partial files stay on disk. Files already checking or transferring are kept until they finish.",
-        buttons:["Keep queue","Delete pending entries"],defaultId:0,cancelId:0,
-      });
-      const removed = result.response === 1 ? removePending(queue,ids) : 0;
-      return {jobs:queue.snapshot(),removed};
-    });
-    handle("retry-naming", async ({id}) => {
-      const job = queue.jobs.find(job => job.id === id && job.status === "complete");
-      if (!job) throw new Error("Completed download not found");
-      const key = queue.seasonKey(job);
-      if (queue.namingLocks.has(key)) throw new Error("This season is already being updated");
-      if (queue.jobs.some(other => queue.seasonKey(other) === key && !["complete", "deleted", "cancelled", "missing"].includes(other.status)))
-        throw new Error("Finish the other queued episodes in this season before retrying naming");
-      await queue.finishSeason(job);
-      return queue.snapshot();
-    });
-    handle("delete-all-saved", async () => {
-      const jobs = queue.jobs.filter(job => job.status === "complete");
-      if (!jobs.length) return {jobs:queue.snapshot(),deleted:0,failures:[]};
-      const result = await confirmInApp({
-        type:"warning",title:"Delete all saved files?",
-        message:`Move ${jobs.length} saved files to the Recycle Bin?`,
-        detail:"Includes BOTH Archive and Watch copies. Changed files and files being renamed will be kept.\n\n" + jobs.slice(0,8).map(job => path.basename(job.finalPath)).join("\n") + (jobs.length > 8 ? "\n...and more" : ""),
-        buttons:["Keep files","Move all to Recycle Bin"],defaultId:0,cancelId:0,
-      });
-      const outcome = result.response === 1 ? await trashCompleted(queue,jobs.map(job => job.id),file => shell.trashItem(file)) : {deleted:0,failures:[]};
-      return {jobs:queue.snapshot(),...outcome};
-    });
-    handle("staging-info", async () => {
-      const files = await orphanedPartials(queue);
-      return {count:files.length,bytes:files.reduce((sum,file)=>sum+file.size,0)};
-    });
-    handle("cleanup-staging", async () => {
-      const files = await orphanedPartials(queue);
-      if (!files.length) return {deleted:0,failures:[]};
-      const result = await confirmInApp({
-        type:"question",title:"Clean up unused partial files?",
-        message:`Move ${files.length} unused partial files to the Recycle Bin?`,
-        detail:"These partial files have no queue entry. Paused, cancelled, failed and active jobs with queue entries are preserved.",
-        buttons:["Keep partials","Move unused partials to Recycle Bin"],defaultId:0,cancelId:0,
-      });
-      return result.response === 1 ? trashOrphans(queue,files.map(file=>file.id),file=>shell.trashItem(file)) : {deleted:0,failures:[]};
-    });
+    const { registerDownloadHandlers } = await import("./handlers/downloads.mjs");
+    registerDownloadHandlers({handle, queue, adapter, shell, confirmInApp});
     handle("disconnect", async () => {
       if (discovery.operation) throw new Error("Stop bot discovery first");
       if (queue.running.size)

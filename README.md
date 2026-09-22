@@ -77,7 +77,7 @@ npm run dev
 
 1. Follow the welcome guide and connect using your own Telegram API ID, API hash and phone number. Obtain API credentials from [Telegram](https://my.telegram.org).
 2. Choose a channel or a supported bot result, then set the show's **Download folder** and optional **Watch folder**.
-3. Select a quality and episodes in **Verified**, or manually choose **Unverified** files. Track downloads and open completed files in **Saved files**.
+3. Select a quality and episodes in **Verified**, or manually choose **Unverified** files. Track downloads in **Downloads ? Ongoing** and open completed files in **Downloads ? Finished**.
 
 Missing a channel? Select **All channels** or adjust **Settings > Channel filtering**. No verified results? Check other available qualities and Unverified. Replay onboarding from **Settings > About > Watch guide again**.
 
@@ -91,7 +91,7 @@ Just exploring? Open the [sample preview](docs/preview.html) locally. It uses sa
 
 Sessions and remembered sign-in details are encrypted using operating-system storage. Passwords and verification codes are not saved. Development and installed apps use separate profiles.
 
-**Clear app data keeps downloaded files and partials on disk.** It clears download/history records, the selected series, watches and lifetime totals; login, preferences and onboarding remain. **Reset lifetime totals** clears only counters. Delete media separately in Saved files, or use File Explorer/Finder after clearing its history.
+**Clear app data keeps downloaded files and partials on disk.** It clears download/history records, the selected series, watches and lifetime totals; login, preferences and onboarding remain. **Reset lifetime totals** clears only counters. **Remove from history** (or **Clear finished history**) also keeps disk files, but the app forgets those downloads and Select missing may offer them again. To delete media, open **Finished ? File details ? Move file to Recycle Bin** and confirm, or use File Explorer/Finder.
 
 Closing pauses downloads, including when the app stays in the tray. Verification and transfers finish safely; resume from the tray or Downloads. Interrupted jobs return paused after restart.
 
@@ -103,6 +103,10 @@ Closing pauses downloads, including when the app stays in the tray. Verification
 - Once releases begin, installed Windows apps check at startup and daily and download updates automatically. **Restart now** installs when work is idle; **Not now** defers installation until the next launch after verification, which requires connectivity. Development mode does not install updates.
 
 </details>
+
+Downloads release their network slot after receiving the file, allowing the next queued file to download while local checking and transferring finish. Disk finishing runs one file at a time. Total active work is capped at twice the simultaneous-download limit to prevent an unbounded staging backlog on slow drives.
+
+**Pause all** retains temporary progress for resuming. **Resume all** resumes paused downloads and retries failed or waiting entries. **Clear queue…** and individual **Remove from queue** permanently delete the removed downloads' temporary data after stopping their writers. Completed files and lifetime usage totals are preserved; files already checking or transferring finish safely. The removal confirmation explains that removed downloads must start from scratch if added again.
 
 ## Build and release
 
@@ -147,7 +151,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The app uses Electron, plain Java
 | `src/ui/` | Interface and interactions |
 | `test/` | Regression tests |
 
-[Contribution and development guide](CONTRIBUTING.md) · [Release setup](README.md#build-and-release)
+[Code architecture](docs/architecture.md) ? [Contribution and development guide](CONTRIBUTING.md) · [Release setup](README.md#build-and-release)
 
 <a id="built-on-vibes"></a>
 

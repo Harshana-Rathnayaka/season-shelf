@@ -26,17 +26,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          notes_file=".github/release-notes/${GITHUB_REF_NAME#v}.md"
           if gh release view "$GITHUB_REF_NAME" --json isDraft > release-state.json; then
             node -e 'if (!require("./release-state.json").isDraft) throw Error("Never overwrite a published release; create a new version")'
           else
             if [ "$GITHUB_REF_NAME" = "v1.0.0" ]; then
               gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Season Shelf 1.0.0 — First release" --notes-file .github/release-notes/1.0.0.md
+            elif [ -f "$notes_file" ]; then
+              gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Season Shelf $GITHUB_REF_NAME" --notes-file "$notes_file"
             else
               gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Season Shelf $GITHUB_REF_NAME" --generate-notes
             fi
           fi
-          if [ "$GITHUB_REF_NAME" = "v1.0.0" ]; then
-            gh release edit "$GITHUB_REF_NAME" --notes-file .github/release-notes/1.0.0.md
+          if [ -f "$notes_file" ]; then
+            gh release edit "$GITHUB_REF_NAME" --notes-file "$notes_file"
           fi
   build:
     needs: prepare

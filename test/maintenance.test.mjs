@@ -60,4 +60,6 @@ test('workspace reset clears metadata atomically while retaining media and accou
   const queue={jobs:data.jobs,running:new Map(),namingLocks:new Set(),emit(){}};const watcher={watches:[{}]};
   clearWorkspace(queue,store,watcher);assert.deepEqual(data.jobs,[]);assert.equal(data.catalogue,null);assert.equal(data.usage.payloadBytes,0);assert.equal(data.credentials,'encrypted');assert.equal(data.onboardingComplete,true);assert.equal(await fs.readFile(file,'utf8'),'keep media');
   queue.running.set('active',{});assert.throws(()=>clearWorkspace(queue,store,watcher),/Pause downloads/);
+  queue.running.clear();queue.removals=new Map([['cleaning',Promise.resolve()]]);
+  assert.throws(()=>clearWorkspace(queue,store,watcher),/Pause downloads/);
 });

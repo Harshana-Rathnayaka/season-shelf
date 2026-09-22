@@ -6,7 +6,7 @@ export function freshUsage() {
 
 // Metadata only: never unlink, move, truncate or traverse downloaded files.
 export function clearWorkspace(queue, store, watcher) {
-  if (queue.running.size || queue.namingLocks.size || queue.recovering || watcher.checking)
+  if (queue.running.size || queue.removals?.size || queue.namingLocks.size || queue.recovering || watcher.checking)
     throw new Error('Pause downloads and wait for file checks to finish before clearing app data.');
   const data={jobs:[],catalogue:null,channels:[],watches:[],usage:freshUsage(),currentBatchId:randomUUID()};
   store.setMany(data);

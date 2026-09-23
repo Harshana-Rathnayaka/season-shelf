@@ -3,8 +3,8 @@
 Season Shelf is migrating to React and TypeScript. The shell and navigation are
 React components checked with strict TypeScript. Downloads and Library also use
 typed React components and command handlers; domain types and download IPC
-contracts live alongside their feature. Settings and Help still use
-JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
+contracts live alongside their feature. Settings, Help and every dialog also use
+typed React components; the JavaScript controller remains transitional. See the
 [migration plan](react-migration.md) for the remaining steps.
 
 | Location | Responsibility |
@@ -12,11 +12,11 @@ JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
 | `src/core/` | Download scheduling, file integrity, persistence and episode rules; no DOM or Electron UI. |
 | `src/desktop/main.cjs` | Application startup, service wiring, window lifecycle and IPC boundary. |
 | `src/desktop/handlers/` | Feature IPC registration with injected services and confirmation dialogs. |
-| `src/ui/app/` | Application composition: shell, React root, transitional controller and legacy page boundary. |
+| `src/ui/app/` | Application composition: shell, React root, transitional controller and typed dialog host. |
 | `src/ui/features/library/` | Library page, selection commands, selectors, types, sample catalogue and feature components. |
 | `src/ui/features/downloads/` | Downloads page, queue commands, selectors, types, IPC contracts and feature components. |
-| `src/ui/features/settings/`, `help/`, `discovery/` | Settings/appearance, help and discovery code, ready for the remaining migration stages. |
-| `src/ui/shared/ui/` | Reusable React buttons, icons and static icon definitions; no feature state. |
+| `src/ui/features/settings/`, `help/`, `discovery/` | React settings sections, help content and discovery dialogs. |
+| `src/ui/shared/ui/` | Reusable buttons, async forms, pending-action hooks and icons; no feature state. |
 | `src/ui/shared/lib/` | Small shared presentation utilities such as byte and error formatting. |
 | `dist/ui/` | Generated Vite output loaded by Electron and included in packages; not committed. |
 | `src/ui/styles/` | Base, shell, feature, responsive and workspace styles. |
@@ -34,7 +34,7 @@ JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
   another feature's components.
 - Keep backend domain rules in `src/core` and privileged integrations in
   `src/desktop`. The renderer structure does not change these responsibilities.
-- Legacy pages return markup; React components return JSX. React views receive
+- React components return JSX. Views receive
   typed action callbacks instead of calling IPC or changing global state. Local
   DOM effects (focus, scroll, mixed checkboxes) use refs within their owning component.
 - Escape external values before inserting them into markup. Shared action
@@ -58,8 +58,8 @@ module parser has been removed. The offline preview retains its hashed CSP.
 
 `npm run check` checks JavaScript syntax, strict TypeScript and the production
 renderer build. Existing JavaScript is not yet type checked. React owns the
-shell; only `LegacyPage` allows the existing controller to own page DOM. Shell-only
-updates must not replace that page DOM or disturb focused inputs.
+pages and dialogs. Background updates must preserve focused controls and unsaved
+form values. Shell interactions use callbacks rather than delegated DOM events.
 
 Run `npm.cmd test`, `npm.cmd run check`, and `node scripts/build-preview.mjs`
 after changing renderer modules. Tests use synthetic files and mocked desktop

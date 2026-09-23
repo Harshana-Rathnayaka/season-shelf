@@ -14,7 +14,7 @@ Branch: `refactor/react-typescript`, based on current `master` (v1.1.0).
 ## Rules
 
 - New React modules use strict TypeScript. Existing JavaScript remains explicitly outside type checking until converted; no blanket `any` or `@ts-nocheck` in new components.
-- React owns the shell. The temporary `LegacyPage` owns only its page container; existing dialog/controller code is retained until its stage.
+- React owns the shell, pages and dialogs. The remaining JavaScript controller is converted in the state/IPC stage.
 - Keep existing CSS and selectors during conversion. Preserve context isolation, sandboxing, preload allowlists and the production content security policy.
 - Preserve completed media, partial-file cleanup, queue concurrency and cumulative usage totals.
 - Each step must pass existing behavioural tests, type checking and a production renderer build. Add regression coverage where ownership or behaviour changes.
@@ -41,7 +41,15 @@ All 141 tests pass; type checking, production builds and the offline preview pas
 The built Library and Downloads views were inspected in Chrome, including sample
 queue controls and dark/light themes. Live Telegram and installer execution have
 not been exercised during these migration stages.
-Steps 4–6 remain; no migration release has been published.
+Step 4 is implemented: Settings sections, Help and all account/discovery/system
+and file dialogs use typed React components. Shared async forms and buttons
+prevent duplicate submissions. Dialog lifecycle state protects credentials and
+ignores stale discovery responses; confirmations cancel once on Escape. The shell
+owns account-menu state and focus, and document-wide action delegation is removed.
+All 146 tests pass, strict TypeScript and production builds pass, and the offline
+preview is regenerated. Unsaved settings survive usage/update events and failed
+saves. No visual redesign was included in this stage.
+Steps 5-6 remain; no migration release has been published.
 
 The renderer now uses feature folders: Library and Downloads each own their page,
 components, actions, selectors and types. Common controls live in `shared/ui`,

@@ -1,38 +1,42 @@
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
-import { AppShell, type ShellState } from "./AppShell";
-import { LegacyPage } from "./LegacyPage";
+import { AppShell, type ShellState, type ShellActionHandler } from "./AppShell";
 import { DownloadsPage } from "../features/downloads/DownloadsPage";
 import type { DownloadsState, DownloadActionHandler } from "../features/downloads/types";
 import { LibraryPage } from "../features/library/LibraryPage";
 import type { LibraryState, LibraryActionHandler } from "../features/library/types";
+import { SettingsPage } from "../features/settings/SettingsPage";
+import type { SettingsState, SettingsActionHandler, SaveSettings } from "../features/settings/types";
+import { HelpPage, type HelpCommand } from "../features/help/HelpPage";
 
-type RendererState = ShellState & DownloadsState & LibraryState;
+type RendererState = ShellState & DownloadsState & LibraryState & SettingsState;
 interface Callbacks {
   onDownloadAction: DownloadActionHandler;
   onLibraryAction: LibraryActionHandler;
   onBrowse: () => void;
   hasDesktop: boolean;
+  onShellAction: ShellActionHandler;
+  onSettingsAction: SettingsActionHandler;
+  onSaveSettings: SaveSettings;
+  onHelpAction: (command: HelpCommand) => Promise<void>;
 }
 
 export function createRenderer(container: HTMLElement, callbacks: Callbacks) {
   const root = createRoot(container);
-  let content = "";
-  let revision = 0;
   function update(state: RendererState, count: number) {
     // The existing controller restores focus/scroll immediately after rendering.
-    flushSync(() => root.render(<AppShell state={state} count={count}>
+    flushSync(() => root.render(<AppShell state={state} count={count} onAction={callbacks.onShellAction}>
       {state.page === "queue"
         ? <DownloadsPage state={state} onAction={callbacks.onDownloadAction} onBrowse={callbacks.onBrowse} />
         : state.page === "library"
           ? <LibraryPage state={state} onAction={callbacks.onLibraryAction} hasDesktop={callbacks.hasDesktop} />
-          : <LegacyPage html={content} revision={revision} />}
+          : state.page === "settings"
+            ? <SettingsPage state={state} onSave={callbacks.onSaveSettings} onAction={callbacks.onSettingsAction} />
+            : <HelpPage onAction={callbacks.onHelpAction} />}
     </AppShell>));
   }
   return {
-    render(state: RendererState, html: string, count: number) {
-      content = html;
-      revision++;
+    render(state: RendererState, count: number) {
       update(state, count);
     },
     updateShell: update,

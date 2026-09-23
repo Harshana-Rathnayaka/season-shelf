@@ -139,6 +139,7 @@ test("suggested channels retain show names; All channels restores hidden finance
   const input=f.document.querySelector('#channel-search');
   input.value='forex';
   input.dispatchEvent(new f.window.Event('input',{bubbles:true}));
+  await new Promise(resolve=>setTimeout(resolve,20));
   assert.equal(f.document.querySelectorAll('.channel-option').length,1);
   f.click('[data-action="channel-filter"][data-filter="suggested"]');
   assert.match(f.document.querySelector('#channel-results').textContent,/Try All channels/);
@@ -318,13 +319,20 @@ test("all pages keep their heading outside the scroll pane and retain position o
 test("account button opens an anchored popup with logout without navigating",async(t)=>{
   const f=await fixture(t,{settings:{theme:'dark'},profile:{name:'Anonymous',username:'D3M0NHA2H'},jobs:[],channels:[]});
   f.click('.profile');
+  await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(f.document.querySelector('#account-popover').hidden,false);
   assert.ok(f.document.querySelector('.library-shell'));
   assert.match(f.document.querySelector('#account-popover').textContent,/@D3M0NHA2H/);
   assert.ok(f.document.querySelector('#account-popover [data-action="disconnect"]'));
   f.document.dispatchEvent(new f.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+  await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(f.document.querySelector('#account-popover').hidden,true);
+  assert.equal(f.document.activeElement,f.document.querySelector('.profile'));
+  f.click('.profile');
+  await new Promise(resolve=>setTimeout(resolve,0));
   f.click('[data-page="settings"]');
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(f.document.querySelector('#account-popover').hidden,true);
   assert.doesNotMatch(f.document.querySelector('main').textContent,/shade of dark|Anonymous \? @/);
 });
 
@@ -608,4 +616,70 @@ test('React library retains selected rows and exposes partial selection', async 
   all.click();
   assert.match(f.document.querySelector('.selection-bar').textContent, /0 episodes selected/);
   assert.equal(all.indeterminate, false);
+});
+
+test('Settings retain unsaved form values and focus during usage and update events', async t => {
+  const f=await fixture(t,{settings:{theme:'dark',transfer:{start:'22:00',end:'06:00'}},jobs:[],channels:[]},async()=>({state:'idle'}));
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  const input=f.document.querySelector('[name="speedKiB"]');
+  const keywords=f.document.querySelector('#hidden-keywords');
+  input.value='777'; keywords.value='unsaved filter'; input.focus();
+  f.emit({type:'usage',data:{payloadBytes:2097152,publishedBytes:0,completedFiles:0}});
+  f.emit({type:'updates',data:{state:'current'}});
+  assert.equal(f.document.querySelector('[name="speedKiB"]'),input);
+  assert.equal(input.value,'777'); assert.equal(keywords.value,'unsaved filter');
+  assert.equal(f.document.activeElement,input);
+  assert.match(f.document.querySelector('#usage-summary').textContent,/2.0 MB/);
+});
+
+test('Settings failed saves preserve drafts and prevent duplicate submissions', async t => {
+  let reject;
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async method=>method==='settings'?new Promise((_resolve,fail)=>{reject=fail;}):{state:'idle'});
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  const form=f.document.querySelector('#keyword-form');
+  form.elements.keywords.value='keep this draft';
+  for(let i=0;i<2;i++)form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.filter(c=>c.method==='settings').length,1);
+  assert.equal(form.querySelector('[type="submit"]').disabled,true);
+  reject(new Error('Could not save preferences'));
+  await new Promise(r=>setTimeout(r,20));
+  assert.equal(form.elements.keywords.value,'keep this draft');
+  assert.equal(form.querySelector('[type="submit"]').disabled,false);
+  assert.match(f.document.querySelector('#toast').textContent,/Could not save preferences/);
+});
+
+test('React confirmation Escape cancels once and treats server text as text', async t => {
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async()=>({}));
+  f.emit({type:'confirmation',data:{id:'confirm',title:'<img src=x>',message:'Keep or remove?',detail:'Completed files stay on disk.',buttons:['Keep','Remove']}});
+  const dialog=f.document.querySelector('#dialog');
+  assert.equal(dialog.querySelector('h2').textContent,'<img src=x>');
+  assert.equal(dialog.querySelector('img'),null);
+  assert.equal(dialog.getAttribute('aria-labelledby'),dialog.querySelector('h2').id);
+  dialog.dispatchEvent(new f.window.Event('cancel',{cancelable:true}));
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(dialog.open,false);
+  assert.deepEqual(f.calls.filter(c=>c.method==='confirmation-reply').map(c=>({id:c.payload.id,response:c.payload.response})),[{id:'confirm',response:0}]);
+});
+
+test('Closing discovery ignores a late response instead of reopening the dialog', async t => {
+  let finish;
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async method=>method==='discovery-source'?new Promise(resolve=>{finish=resolve;}):{});
+  f.click('[data-action="choose-series"]');f.click('[data-action="discover"]');f.click('[data-action="discovery-source"]');
+  f.click('[data-action="close-dialog"]');await new Promise(resolve=>setTimeout(resolve,0));
+  finish({source:{id:'late',title:'Late group'}});
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(f.document.querySelector('#dialog').open,false);
+  assert.equal(f.document.querySelector('#discovery-form'),null);
+  assert.equal(f.calls.filter(c=>c.method==='discovery-cancel').length,1);
+});
+
+test('Closing an authentication prompt cancels it and removes credential controls', async t => {
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async()=>({}));
+  f.emit({type:'auth-prompt',data:{id:'auth',label:'Two-step verification',kind:'password'}});
+  f.document.querySelector('#auth-form input').value='test-only-secret';
+  f.click('[data-action="close-dialog"]');await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(f.document.querySelector('#auth-form'),null);
+  assert.equal(f.document.querySelector('#dialog').open,false);
+  assert.deepEqual(f.calls.filter(c=>c.method==='auth-reply').map(c=>({id:c.payload.id,cancel:c.payload.cancel})),[{id:'auth',cancel:true}]);
 });

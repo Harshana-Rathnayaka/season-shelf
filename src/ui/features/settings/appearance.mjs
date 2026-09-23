@@ -19,19 +19,6 @@ export function applyAppearance(settings) {
   if (appearance.text) style.setProperty("--text", appearance.text);
 }
 
-export function appearanceForm(settings) {
-  const value = cleanAppearance(settings.appearance);
-  return `<form id="appearance-form" class="keyword-settings"><h3>Typography and colours</h3>
-    <p>Changes preview immediately. Apply to save them across the app.</p>
-    <div class="appearance-grid">
-    <label>Text size<select name="size">${[90,100,110,120].map(size => `<option value="${size}" ${value.size === size ? "selected" : ""}>${size}%</option>`).join("")}</select></label>
-    <label>Text weight<select name="weight">${[[400,"Regular"],[500,"Medium"],[600,"Semibold"]].map(([weight,label]) => `<option value="${weight}" ${value.weight === weight ? "selected" : ""}>${label}</option>`).join("")}</select></label>
-    <label>Accent colour<input name="accent" type="color" value="${value.accent || "#a0e4c6"}"><span><input name="autoAccent" type="checkbox" ${value.accent ? "" : "checked"}> Automatic</span></label>
-    <label>Text colour<input name="text" type="color" value="${value.text || "#edf0ef"}"><span><input name="autoText" type="checkbox" ${value.text ? "" : "checked"}> Automatic</span></label>
-    </div><div class="row-actions"><button class="button primary" type="submit">Apply appearance</button><button class="button secondary" data-action="reset-appearance" type="button">Reset appearance</button></div>
-    <p>Custom text colour applies to both themes. Reset restores readable defaults.</p></form>`;
-}
-
 export function appearanceValues(form) {
   const fields = form.elements;
   return cleanAppearance({size:fields.namedItem("size").value,weight:fields.namedItem("weight").value,

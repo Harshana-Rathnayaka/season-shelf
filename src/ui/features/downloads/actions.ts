@@ -1,17 +1,16 @@
 import { canPauseDownload, canResumeDownload, canRemoveDownload } from "./selectors";
-import { fileDetails } from "./components/file-details.mjs";
-import type { DownloadCommand, DownloadCall, DownloadsState } from "./types";
+import type { DownloadCommand, DownloadCall, DownloadsState, DownloadRecord } from "./types";
 
 interface Context {
   state: DownloadsState;
   call: DownloadCall;
   render: () => void;
   toast: (message: string, error?: boolean) => void;
-  modal: (html: string) => void;
+  showFileDetails: (job: DownloadRecord) => void;
   closeDialog: () => void;
 }
 
-export async function handleDownloadCommand(command: DownloadCommand, { state, call, render, toast, modal, closeDialog }: Context): Promise<void> {
+export async function handleDownloadCommand(command: DownloadCommand, { state, call, render, toast, showFileDetails, closeDialog }: Context): Promise<void> {
   switch (command.action) {
     case "download-tab":
       state.downloadTab = command.tab;
@@ -37,14 +36,14 @@ export async function handleDownloadCommand(command: DownloadCommand, { state, c
     case "file-details": {
       const job = state.jobs.find(job => job.id === command.job);
       if (!job) throw new Error("Download no longer exists.");
-      modal(fileDetails(job));
+      showFileDetails(job);
       return;
     }
     case "retry-naming": {
       state.jobs = await call("retry-naming", { id: command.job });
       const job = state.jobs.find(job => job.id === command.job);
       if (!job) throw new Error("Download no longer exists.");
-      modal(fileDetails(job));
+      showFileDetails(job);
       toast(job.namingError || "Season filenames updated.", !!job.namingError);
       break;
     }

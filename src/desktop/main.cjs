@@ -23,7 +23,7 @@ let watcher,
   authPrompt,
   sleepBlocker,
   quitting = false;
-const uiFile = path.join(__dirname, "../ui/index.html");
+const uiFile = path.join(__dirname, "../../dist/ui/index.html");
 const uiUrl = pathToFileURL(uiFile).href;
 const runtime = require("./environment.cjs").resolveEnvironment({isPackaged:app.isPackaged,metadata:require('../../package.json'),argv:process.argv});
 require("./profile.cjs").configureProfile(app, runtime.environment);

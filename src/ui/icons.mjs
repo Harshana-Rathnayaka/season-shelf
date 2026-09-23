@@ -1,4 +1,4 @@
-const paths = {
+export const paths = {
   sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
   shelf:
     '<rect x="3" y="3" width="5" height="15" rx="1.5"/><rect x="11" y="3" width="5" height="15" rx="1.5"/><path d="m19 5 2 13M3 22h18"/>',

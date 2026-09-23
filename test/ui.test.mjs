@@ -480,3 +480,32 @@ test('development updates explain why checks are unavailable without a misleadin
   assert.equal(f.document.querySelector('.update-last-checked'),null);
   assert.match(f.document.querySelector('#update-status').textContent,/disabled in development/);
 });
+
+test('React shell updates queue badges without replacing focused page controls', async t => {
+  const f = await fixture(t, { settings: { theme: 'dark' }, jobs: [], channels: [] });
+  f.click('[data-page="settings"]');
+  const input = f.document.querySelector('input');
+  assert.ok(input);
+  input.focus();
+  const before = f.document.querySelector('main').firstChild;
+  const job = { id: 'active', status: 'downloading', item: { filename: 'episode.mkv', size: 100 } };
+  f.emit({ type: 'queue', data: [job] });
+  assert.equal(f.document.querySelector('.nav-count').textContent, '1');
+  assert.equal(f.document.activeElement, input);
+  assert.equal(f.document.querySelector('main').firstChild, before);
+  f.emit({ type: 'queue', data: [] });
+  assert.equal(f.document.querySelector('.nav-count'), null);
+  assert.equal(f.document.activeElement, input);
+});
+
+test('React shell renders account names as text and preserves navigation focus', async t => {
+  const name = '<img src=x onerror=alert(1)>';
+  const f = await fixture(t, { settings: { theme: 'dark' }, jobs: [], channels: [], profile: { name } });
+  assert.equal(f.document.querySelector('.profile strong').textContent, name);
+  assert.equal(f.document.querySelector('.profile img'), null);
+  const settings = f.document.querySelector('[data-page="settings"]');
+  settings.focus();
+  settings.click();
+  assert.equal(f.document.activeElement, settings);
+  assert.match(settings.className, /active/);
+});

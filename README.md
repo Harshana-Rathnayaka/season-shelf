@@ -142,7 +142,7 @@ See the [roadmap](docs/ROADMAP.md) for next steps and remaining release prerequi
 
 ## 🤝 Contribute
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md). The app uses Electron, plain JavaScript and SQLite:
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). The app uses Electron and SQLite, with a renderer migrating to React and TypeScript ([plan](docs/react-migration.md)):
 
 | Location | Responsibility |
 | --- | --- |

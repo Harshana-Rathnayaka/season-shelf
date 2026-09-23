@@ -5,6 +5,7 @@
       "name": "Electron: Development",
       "type": "node",
       "request": "launch",
+      "preLaunchTask": "Build renderer",
       "runtimeExecutable": "${workspaceFolder}/node_modules/electron/dist/electron",
       "windows": {
         "runtimeExecutable": "${workspaceFolder}/node_modules/electron/dist/electron.exe"

@@ -5,7 +5,7 @@ import { library } from "./pages/library.mjs";
 import { queuePage } from "./pages/downloads.mjs";
 import { helpPage } from "./pages/help.mjs";
 import { settingsPage, usageTiles } from "./pages/settings.mjs";
-import { appShell } from "./components/app-shell.mjs";
+import { createRenderer } from "./react-renderer.tsx";
 import { handleDownloadAction, isDownloadAction } from "./actions/downloads.mjs";
 import { missingEpisodes } from "../core/collection.mjs";
 import { applyAppearance, appearanceValues, previewAppearance } from "./appearance.mjs";
@@ -15,6 +15,7 @@ import { channelCategory, defaultHiddenKeywords, cleanKeywords } from "../core/c
 import { demoCatalogue } from "./demo.mjs";
 
 const $ = (selector) => document.querySelector(selector);
+const renderer = createRenderer(document.getElementById("app"));
 const state = {
   updates: {state:"idle"},
   page: "library",
@@ -108,7 +109,7 @@ function render() {
   const count = pendingDownloadCount(state.jobs);
   $("#app").classList.toggle("custom-titlebar", !!state.customTitleBar);
   const content = state.page === "library" ? library(state, !!window.shelf) : state.page === "settings" ? settingsPage(state) : state.page === "help" ? helpPage() : queuePage(state);
-  $("#app").innerHTML = appShell(state, content, count);
+  renderer.render(state, content, count);
   if (state.page === "library")
     $("#select-all")?.setAttribute("aria-label", "Select all visible episodes");
   if ($(".episode-table") && libraryViewKey === viewKey) $(".episode-table").scrollTop = oldTop;
@@ -120,10 +121,7 @@ function render() {
 
 }
 function refreshQueueBadge() {
-  const button=$('[data-page="queue"]');if(!button)return;
-  const count=pendingDownloadCount(state.jobs);
-  let badge=button.querySelector(".nav-count");if(!count){badge?.remove();return;}
-  if(!badge){badge=document.createElement("b");badge.className="nav-count";button.append(badge);}badge.textContent=count;
+  renderer.updateShell(state, pendingDownloadCount(state.jobs));
 }
 function updateSeasonArrows() {
   const tabs = $(".season-tabs");
@@ -559,6 +557,7 @@ $("#dialog").addEventListener("cancel", async () => {
     await call("auth-reply", { id, cancel: true }).catch(() => {});
   }
 });
+async function initialize() {
 if (window.shelf) {
   window.shelf.on(({ type, data }) => {
     if(type === "confirmation") {
@@ -604,3 +603,5 @@ if (window.shelf) {
     toast(error.message, true);
   }
 } else startDemo();
+}
+export const ready = initialize();

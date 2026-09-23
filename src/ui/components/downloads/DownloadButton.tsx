@@ -1,6 +1,5 @@
-import { useRef, useState } from "react";
 import type { DownloadActionHandler, DownloadCommand } from "../../types/downloads";
-import { ActionButton } from "../ActionButton";
+import { AsyncActionButton } from "../AsyncActionButton";
 
 interface Props {
   command: DownloadCommand;
@@ -14,18 +13,9 @@ interface Props {
 }
 
 export function DownloadButton({ command, onAction, disabled, ...props }: Props) {
-  const [pending, setPending] = useState(false);
-  const inFlight = useRef(false);
-  return <ActionButton {...props} disabled={disabled || pending} aria-busy={pending || undefined}
+  return <AsyncActionButton {...props} disabled={disabled}
     data-action={command.action}
     data-job={"job" in command ? command.job : undefined}
     data-control={"control" in command ? command.control : undefined}
-    onClick={async event => {
-      event.stopPropagation();
-      if (inFlight.current) return;
-      inFlight.current = true;
-      setPending(true);
-      try { await onAction(command); }
-      finally { inFlight.current = false; setPending(false); }
-    }} />;
+    onAction={() => onAction(command)} />;
 }

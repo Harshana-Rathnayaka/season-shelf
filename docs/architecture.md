@@ -1,9 +1,9 @@
 # Code organization
 
 Season Shelf is migrating to React and TypeScript. The shell and navigation are
-React components checked with strict TypeScript. Downloads also uses typed React
-components and command handlers; its records and IPC contracts live in `src/ui/types/`.
-Library, Settings and Help still use
+React components checked with strict TypeScript. Downloads and Library also use
+typed React components and command handlers; domain types and download IPC
+contracts live in `src/ui/types/`. Settings and Help still use
 JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
 [migration plan](react-migration.md) for the remaining steps.
 
@@ -12,9 +12,10 @@ JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
 | `src/core/` | Download scheduling, file integrity, persistence and episode rules; no DOM or Electron UI. |
 | `src/desktop/main.cjs` | Application startup, service wiring, window lifecycle and IPC boundary. |
 | `src/desktop/handlers/` | Feature IPC registration with injected services and confirmation dialogs. |
-| `src/ui/app.mjs` | Renderer state, application lifecycle, event delegation and DOM replacement. |
+| `src/ui/app.mjs` | Transitional renderer state, application lifecycle, IPC integration and legacy dialog/settings event handling. |
 | `src/ui/pages/` | Compose complete Library, Downloads, Settings and Help views from explicit state. |
 | `src/ui/components/` | Action buttons, shell, quality picker, download rows/actions and file details. |
+| `src/ui/components/library/`, `src/ui/components/downloads/` | Feature React components; share common buttons and icons from the parent directory. |
 | `src/ui/react-renderer.tsx` | React root and temporary synchronous adapter for the existing controller. |
 | `dist/ui/` | Generated Vite output loaded by Electron and included in packages; not committed. |
 | `src/ui/models/` | Pure display selection, ordering, counts and control eligibility. |
@@ -24,9 +25,9 @@ JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
 
 ## Boundaries
 
-- Legacy pages return markup; React components return JSX. They do not call IPC, change global
-  state, or find elements in the document. Keep DOM effects in the renderer
-  controller or feature action handlers.
+- Legacy pages return markup; React components return JSX. React views receive
+  typed action callbacks instead of calling IPC or changing global state. Local
+  DOM effects (focus, scroll, mixed checkboxes) use refs within their owning component.
 - Escape external values before inserting them into markup. Shared action
   buttons escape labels and data attributes centrally.
 - Display predicates are shared by row controls, bulk controls and sample

@@ -33,4 +33,12 @@ typed commands and download IPC contracts. Stable keyed rows preserve focus and
 scroll during progress updates; pending controls prevent duplicate requests.
 Saving and verification phases have readable explanations. All 139 tests pass.
 File details and Settings still use an explicit legacy action adapter.
-Steps 3–6 remain; no migration release has been published.
+Step 3 is implemented: Library uses typed React quality selection, season tabs,
+episode rows, selection controls and local state commands. Search retains its
+input/caret, selected rows retain focus and scroll, and Select all exposes a
+mixed state. Shared async buttons prevent duplicate requests across both pages.
+All 141 tests pass; type checking, production builds and the offline preview pass.
+The built Library and Downloads views were inspected in Chrome, including sample
+queue controls and dark/light themes. Live Telegram and installer execution have
+not been exercised during these migration stages.
+Steps 4–6 remain; no migration release has been published.

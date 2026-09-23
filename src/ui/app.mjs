@@ -1,7 +1,7 @@
 import { pendingDownloadCount } from "./models/downloads.ts";
 import { escape, friendlyError } from "./format.mjs";
-import { chosen, visible, selectedItems, effectiveQuality } from "./models/library.mjs";
-import { library } from "./pages/library.mjs";
+import { chosen, visible, selectedItems, effectiveQuality } from "./models/library.ts";
+import { updateLibrary } from "./actions/library.ts";
 import { helpPage } from "./pages/help.mjs";
 import { settingsPage, usageTiles } from "./pages/settings.mjs";
 import { createRenderer } from "./react-renderer.tsx";
@@ -16,6 +16,8 @@ import { demoCatalogue } from "./demo.mjs";
 const $ = (selector) => document.querySelector(selector);
 const renderer = createRenderer(document.getElementById("app"), {
   onDownloadAction: dispatchDownload,
+  onLibraryAction: dispatchLibrary,
+  hasDesktop: !!window.shelf,
   onBrowse: () => { state.page = "library"; render(); },
 });
 const state = {
@@ -41,7 +43,7 @@ const state = {
   busy: false,
 };
 let discoveryVersion = 0, discoveryBusy = false, titleBarColours = "";
-let toastTimer, liveSnapshot, libraryViewKey, seasonChannelKey, renderedPage;
+let toastTimer, liveSnapshot, renderedPage;
 function toast(message, error = false) {
   const el = $("#toast");
   el.textContent = friendlyError(message);
@@ -102,49 +104,18 @@ function render() {
   const pageKey = state.page === "queue" ? `${state.page}:${state.downloadTab}` : state.page;
   const keepPageScroll = renderedPage === pageKey;
   renderedPage = pageKey;
-  const oldTop = $(".episode-table")?.scrollTop || 0;
-  const oldLeft = $(".season-tabs")?.scrollLeft || 0;
-  const channelKey = state.catalogue?.channel.id;
-  const viewKey = JSON.stringify([channelKey, state.libraryTab, state.season, effectiveQuality(state), state.query]);
   applyTheme();
   $("#app").classList.toggle("sidebar-collapsed", !!state.settings.sidebarCollapsed);
   const count = pendingDownloadCount(state.jobs);
   $("#app").classList.toggle("custom-titlebar", !!state.customTitleBar);
-  const content = state.page === "library" ? library(state, !!window.shelf) : state.page === "settings" ? settingsPage(state) : state.page === "help" ? helpPage() : "";
+  const content = state.page === "settings" ? settingsPage(state) : state.page === "help" ? helpPage() : "";
   renderer.render(state, content, count);
-  if (state.page === "library")
-    $("#select-all")?.setAttribute("aria-label", "Select all visible episodes");
-  if ($(".episode-table") && libraryViewKey === viewKey) $(".episode-table").scrollTop = oldTop;
-  if ($(".season-tabs") && seasonChannelKey === channelKey) $(".season-tabs").scrollLeft = oldLeft;
-  libraryViewKey = viewKey;
-  seasonChannelKey = channelKey;
   if (keepPageScroll && $(".workspace-scroll")) $(".workspace-scroll").scrollTop = oldPageScroll;
-  updateSeasonArrows();
 
 }
 function refreshQueueBadge() {
   renderer.updateShell(state, pendingDownloadCount(state.jobs));
 }
-function updateSeasonArrows() {
-  const tabs = $(".season-tabs");
-  if (!tabs) return;
-  const overflow = tabs.scrollWidth > tabs.clientWidth + 1;
-  $(".season-prev").disabled = !overflow || tabs.scrollLeft <= 1;
-  $(".season-next").disabled = !overflow || tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 1;
-}
-document.addEventListener("scroll", event => {
-  if (event.target.classList?.contains("season-tabs")) updateSeasonArrows();
-}, true);
-window.addEventListener("resize", updateSeasonArrows);
-document.addEventListener("keydown", event => {
-  const tab = event.target.closest?.('[data-action="season"]');
-  if (!tab || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-  event.preventDefault();
-  const tabs = [...document.querySelectorAll('[data-action="season"]')];
-  const index = tabs.indexOf(tab);
-  const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : Math.max(0, Math.min(tabs.length - 1, index + (event.key === "ArrowRight" ? 1 : -1)));
-  tabs[next].click();
-});
 function updatePrompt() {
   if(state.updates?.state!=="ready" || state.updates.deferred || $("#dialog").open) return;
   modal(`<h2>Your update is ready</h2><p>Version ${escape(state.updates.version)} has downloaded. Restart now, or install on your next launch after verification.</p><p id="update-error" role="alert"></p><div class="dialog-actions"><button class="button secondary" data-action="update-later">Not now</button><button class="button primary" data-action="update-install">Restart now</button></div>`);
@@ -257,6 +228,11 @@ async function setSettings(patch) {
   render();
 }
 
+async function dispatchLibrary(command) {
+  if (updateLibrary(state, command)) { render(); return; }
+  await dispatchAction(command.action, "mode" in command ? { mode: command.mode } : {});
+}
+
 async function dispatchDownload(command) {
   try {
     await handleDownloadCommand(command, { state, call, render, toast, modal, closeDialog: () => $("#dialog").close() });
@@ -274,43 +250,35 @@ document.addEventListener("click", (event) => {
 }, true);
 
 document.addEventListener("click", async (event) => {
-  const row = event.target.closest?.("[data-episode-row]");
-  if (row && !event.target.closest?.("input, button, a") && !window.getSelection()?.toString()) {
-    const id = row.dataset.episodeRow;
-    state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id);
-    render();
-    return;
-  }
   const el = event.target.closest?.("[data-action]");
   if (!el) return;
   event.preventDefault();
-  const action = el.dataset.action;
+  await dispatchAction(el.dataset.action, el.dataset);
+});
+
+async function dispatchAction(action, data = {}) {
   try {
-    const downloadCommand = legacyDownloadCommand(action, el.dataset);
+    const downloadCommand = legacyDownloadCommand(action, data);
     if (downloadCommand) {
       await dispatchDownload(downloadCommand);
       return;
     }
     if (action === "confirmation-reply") {
-      const id=$("#dialog").dataset.confirmationId;delete $("#dialog").dataset.confirmationId;$("#dialog").close();await call("confirmation-reply",{id,response:Number(el.dataset.response)});
+      const id=$("#dialog").dataset.confirmationId;delete $("#dialog").dataset.confirmationId;$("#dialog").close();await call("confirmation-reply",{id,response:Number(data.response)});
     } else if (action === "use-login") {
-      const saved=await call("login-suggestion",{id:el.dataset.id});const form=$("#connect-form");if(form)for(const field of ["apiId","apiHash","phone"])form.elements[field].value=saved[field];
+      const saved=await call("login-suggestion",{id:data.id});const form=$("#connect-form");if(form)for(const field of ["apiId","apiHash","phone"])form.elements[field].value=saved[field];
     } else if (action === "forget-logins") { await call("forget-login-suggestions");$("#login-suggestions").replaceChildren();
     } else if (action === "update-later") {state.updates=await call("update-later");$("#dialog").close();render();
     } else if (action === "account-menu") {
       const menu = $("#account-popover");
       menu.hidden = !menu.hidden;
-      el.setAttribute("aria-expanded",String(!menu.hidden));
+      $(".profile").setAttribute("aria-expanded",String(!menu.hidden));
       if (!menu.hidden) menu.querySelector("button").focus();
     } else if (action === "toggle-sidebar") {
       await setSettings({sidebarCollapsed: !state.settings.sidebarCollapsed});
       $(".sidebar-toggle").focus();
-    } else if (action === "scroll-seasons") {
-      const tabs = $(".season-tabs");
-      tabs.scrollLeft += Number(el.dataset.direction) * Math.max(180, tabs.clientWidth * 0.75);
-      updateSeasonArrows();
     } else if (action === "nav") {
-      state.page = el.dataset.page;
+      state.page = data.page;
       if (state.page === "queue") state.downloadTab = "ongoing";
       render();
       if(state.page === "settings" && window.shelf) {state.updates=await call("update-status");render();}
@@ -325,37 +293,11 @@ document.addEventListener("click", async (event) => {
       await setSettings({hiddenKeywords:[...defaultHiddenKeywords]});
       toast("Default keywords restored.");
     } else if (action === "set-theme")
-      await setSettings({ theme: el.dataset.theme });
-    else if (action === "quality") {
-      state.quality = { ...effectiveQuality(state), [el.dataset.field]: el.dataset.field === "resolution" ? Number(el.dataset.value) : el.dataset.value };
-      state.selected.clear();
-      state.season = chosen(state).some(i => i.season === state.season) ? state.season : chosen(state)[0]?.season || 1;
-      render();
-      document.querySelector(`[data-action="quality"][data-field="${el.dataset.field}"][data-value="${el.dataset.value}"]`)?.focus();
-    } else if (action === "channel-filter") {
-      state.channelFilter = el.dataset.filter;
+      await setSettings({ theme: data.theme });
+    else if (action === "channel-filter") {
+      state.channelFilter = data.filter;
       renderChannels($("#channel-search").value);
       document.querySelector(`[data-filter="${state.channelFilter}"]`)?.focus();
-    } else if (action === "mode") {
-      state.mode = el.dataset.mode;
-      state.quality = {};
-      state.selected.clear();
-      state.query = "";
-      state.season = chosen(state).some((i) => i.season === state.season)
-        ? state.season
-        : chosen(state)[0]?.season || 1;
-      render();
-    } else if (action === "season") {
-      state.season = Number(el.dataset.season);
-      state.query = "";
-      render();
-      const tab = document.getElementById(`season-${state.season}`);
-      tab?.focus({preventScroll:true});
-      tab?.scrollIntoView?.({block:"nearest",inline:"nearest"});
-    } else if (action === "select-season") {
-      const items = state.libraryTab === "unverified" ? visible(state) : chosen(state).filter((i) => i.season === state.season);
-      items.forEach((i) => state.selected.add(i.id));
-      render();
     } else if (action === "connect") connectionModal();
     else if (action === "reconnect") await connect({});
     else if (["update-check","update-download","update-install"].includes(action)) {if(action === "update-check"){if(state.updateChecking)return;state.updateChecking=true;render();}try{state.updates=await call(action);render();}catch(error){if($("#update-error")) $("#update-error").textContent=friendlyError(error.message);else throw error;}finally{state.updateChecking=false;render();}}
@@ -378,12 +320,12 @@ document.addEventListener("click", async (event) => {
     } else if (action === "discovery-source") {
       await discoveryRequest("discovery-source");
     } else if (action === "discovery-group") {
-      await discoveryRequest("discovery-source",{groupId:el.dataset.choice});
+      await discoveryRequest("discovery-source",{groupId:data.choice});
     } else if (action === "discovery-follow") {
-      await discoveryRequest("discovery-follow",{id:el.dataset.choice});
+      await discoveryRequest("discovery-follow",{id:data.choice});
     } else if (action === "discovery-join") {
-      await discoveryRequest("discovery-join",{id:el.dataset.choice});
-    } else if (action === "scan-channel") await scan(el.dataset.channel);
+      await discoveryRequest("discovery-join",{id:data.choice});
+    } else if (action === "scan-channel") await scan(data.channel);
     else if (action === "rescan") await scan(state.catalogue.channel.id);
     else if (action === "demo") startDemo();
     else if (action === "exit-demo") {
@@ -411,7 +353,7 @@ document.addEventListener("click", async (event) => {
         return toast(
           "Folder selection is available in the connected desktop app.",
         );
-      state.settings = await call("choose-folder", { mode: el.dataset.mode });
+      state.settings = await call("choose-folder", { mode: data.mode });
       render();
     } else if (action === "download") {
       if (state.demo) {
@@ -455,8 +397,6 @@ document.addEventListener("click", async (event) => {
       toast(
         "Local session forgotten. You can also revoke it in Telegram → Devices.",
       );
-    } else if (action === "library-tab") {
-      state.libraryTab = el.dataset.tab; render();
     } else if (action === "show-guide") { showGuide();
     } else if (action === "clear-app-data") {
       const result=await call("clear-app-data");if(result.cleared){Object.assign(state,result);state.selected.clear();state.libraryTab="verified";state.query="";state.season=1;state.stagingInfo=null;render();toast("App data cleared. Files on disk were kept.");}
@@ -469,7 +409,7 @@ document.addEventListener("click", async (event) => {
   } catch (error) {
     toast(error.message, true);
   }
-});
+}
 document.addEventListener("keydown", event => {
   const menu = $("#account-popover");
   if (event.key === "Escape" && menu && !menu.hidden) {
@@ -485,23 +425,7 @@ document.addEventListener("change", async (event) => {
     if(event.target.name === "scheduled" && event.target.form?.id === "transfer-form") {event.target.form.querySelector(".schedule-times").disabled=!event.target.checked;return;}
     if(event.target.id === "close-behavior") {await setSettings({closeToTray:event.target.value==="tray"});return;}
     if(event.target.id === "automatic-updates") {state.settings=await call("update-preference",{enabled:event.target.checked});return;}
-    if (event.target.dataset.episode) {
-      const id = event.target.dataset.episode;
-      event.target.checked ? state.selected.add(id) : state.selected.delete(id);
-      render();
-    } else if (event.target.id === "select-all") {
-      visible(state).forEach((item) =>
-        event.target.checked
-          ? state.selected.add(item.id)
-          : state.selected.delete(item.id),
-      );
-      render();
-    } else if (event.target.id.startsWith("quality-")) {
-      state.quality[event.target.id === "quality-resolution" ? "resolution" : "codec"] = event.target.id === "quality-resolution" ? Number(event.target.value) : event.target.value;
-      state.selected.clear();
-      state.season = chosen(state).some(i => i.season === state.season) ? state.season : chosen(state)[0]?.season || 1;
-      render();
-    } else if (event.target.id === "concurrency")
+    if (event.target.id === "concurrency")
       await setSettings({ concurrency: Number(event.target.value) });
   } catch (error) {
     toast(error.message, true);
@@ -514,14 +438,7 @@ document.addEventListener("input", (event) => {
       button.hidden = !button.textContent.toLowerCase().includes(event.target.value.toLowerCase().trim());
     return;
   }
-  if (event.target.id === "episode-search") {
-    const cursor = event.target.selectionStart;
-    state.query = event.target.value;
-    render();
-    const input = $("#episode-search");
-    input.focus();
-    input.setSelectionRange(cursor, cursor);
-  } else if (event.target.id === "channel-search")
+  if (event.target.id === "channel-search")
     renderChannels(event.target.value);
 });
 document.addEventListener("submit", async (event) => {

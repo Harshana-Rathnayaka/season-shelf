@@ -165,6 +165,7 @@ test("season navigation scrolls overflowing tabs and keyboard End reaches the la
   const tabs=f.document.querySelector('.season-tabs');
   Object.defineProperties(tabs,{clientWidth:{value:300},scrollWidth:{value:2000}});
   f.window.dispatchEvent(new f.window.Event('resize'));
+  await new Promise(resolve => setTimeout(resolve, 20));
   f.click('.season-next');
   assert.equal(tabs.scrollLeft,225);
   f.document.querySelector('[data-action="season"]').dispatchEvent(new f.window.KeyboardEvent('keydown',{key:'End',bubbles:true}));
@@ -572,4 +573,39 @@ test('Saving phase explains disk transfer and prevents clearing finishing files'
   assert.match(f.document.querySelector('.download-phase').textContent, /next download can start/);
   assert.equal(f.document.querySelector('[data-action="delete-all-queue"]').disabled, true);
   assert.equal(f.document.querySelector('.queue-item [data-control="remove"]'), null);
+});
+
+test('React library search retains its input and caret while filtering rows', async t => {
+  const f = await fixture(t);
+  const input = f.document.querySelector('#episode-search');
+  input.focus();
+  input.value = 'Episode 5';
+  input.setSelectionRange(4, 4);
+  input.dispatchEvent(new f.window.Event('input', { bubbles: true }));
+  assert.equal(f.document.querySelector('#episode-search'), input);
+  assert.equal(f.document.activeElement, input);
+  assert.equal(input.selectionStart, 4);
+  assert.equal(f.document.querySelectorAll('[data-episode-row]').length, 1);
+  assert.match(f.document.querySelector('[data-episode-row]').textContent, /Episode 5/);
+});
+
+test('React library retains selected rows and exposes partial selection', async t => {
+  const f = await fixture(t);
+  const row = f.document.querySelector('[data-episode-row]');
+  const checkbox = row.querySelector('input');
+  const all = f.document.querySelector('#select-all');
+  assert.equal(all.indeterminate, true);
+  checkbox.focus();
+  checkbox.click();
+  assert.equal(f.document.querySelector('[data-episode-row]'), row);
+  assert.equal(f.document.activeElement, checkbox);
+  assert.equal(checkbox.checked, false);
+  assert.match(f.document.querySelector('.selection-bar').textContent, /2 episodes selected/);
+  all.click();
+  assert.equal(all.checked, true);
+  assert.equal(all.indeterminate, false);
+  assert.match(f.document.querySelector('.selection-bar').textContent, /8 episodes selected/);
+  all.click();
+  assert.match(f.document.querySelector('.selection-bar').textContent, /0 episodes selected/);
+  assert.equal(all.indeterminate, false);
 });

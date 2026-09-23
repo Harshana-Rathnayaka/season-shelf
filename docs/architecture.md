@@ -3,7 +3,7 @@
 Season Shelf is migrating to React and TypeScript. The shell and navigation are
 React components checked with strict TypeScript. Downloads and Library also use
 typed React components and command handlers; domain types and download IPC
-contracts live in `src/ui/types/`. Settings and Help still use
+contracts live alongside their feature. Settings and Help still use
 JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
 [migration plan](react-migration.md) for the remaining steps.
 
@@ -12,19 +12,28 @@ JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
 | `src/core/` | Download scheduling, file integrity, persistence and episode rules; no DOM or Electron UI. |
 | `src/desktop/main.cjs` | Application startup, service wiring, window lifecycle and IPC boundary. |
 | `src/desktop/handlers/` | Feature IPC registration with injected services and confirmation dialogs. |
-| `src/ui/app.mjs` | Transitional renderer state, application lifecycle, IPC integration and legacy dialog/settings event handling. |
-| `src/ui/pages/` | Compose complete Library, Downloads, Settings and Help views from explicit state. |
-| `src/ui/components/` | Action buttons, shell, quality picker, download rows/actions and file details. |
-| `src/ui/components/library/`, `src/ui/components/downloads/` | Feature React components; share common buttons and icons from the parent directory. |
-| `src/ui/react-renderer.tsx` | React root and temporary synchronous adapter for the existing controller. |
+| `src/ui/app/` | Application composition: shell, React root, transitional controller and legacy page boundary. |
+| `src/ui/features/library/` | Library page, selection commands, selectors, types, sample catalogue and feature components. |
+| `src/ui/features/downloads/` | Downloads page, queue commands, selectors, types, IPC contracts and feature components. |
+| `src/ui/features/settings/`, `help/`, `discovery/` | Settings/appearance, help and discovery code, ready for the remaining migration stages. |
+| `src/ui/shared/ui/` | Reusable React buttons, icons and static icon definitions; no feature state. |
+| `src/ui/shared/lib/` | Small shared presentation utilities such as byte and error formatting. |
 | `dist/ui/` | Generated Vite output loaded by Electron and included in packages; not committed. |
-| `src/ui/models/` | Pure display selection, ordering, counts and control eligibility. |
-| `src/ui/actions/` | Feature interactions with explicit state, bridge and rendering dependencies. |
-| `src/ui/format.mjs` | Shared escaping, byte formatting and readable errors. |
 | `src/ui/styles/` | Base, shell, feature, responsive and workspace styles. |
 
 ## Boundaries
 
+- Organize renderer code by feature, with its page, `components/`, `actions.ts`,
+  `selectors.ts` and `types.ts` together. Add these files only when needed.
+  Do not recreate global folders for every file category.
+- `app` composes features; features use shared UI and utilities. Shared code must
+  not import features or app wiring. Feature-specific components stay with their
+  feature until another feature actually needs them.
+- Keep imports explicit; avoid barrel files that hide dependencies or create
+  cycles. Put cross-feature orchestration in `app`, rather than reaching into
+  another feature's components.
+- Keep backend domain rules in `src/core` and privileged integrations in
+  `src/desktop`. The renderer structure does not change these responsibilities.
 - Legacy pages return markup; React components return JSX. React views receive
   typed action callbacks instead of calling IPC or changing global state. Local
   DOM effects (focus, scroll, mixed checkboxes) use refs within their owning component.

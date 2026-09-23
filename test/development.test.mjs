@@ -28,10 +28,10 @@ test("development reloads despite active work and requests one normal restart", 
   onChange("change","ui/styles.css"); await apply();
   assert.equal(reloads,1); assert.equal(restarts,0);
   assert.equal(cleanups,1);
-  onChange("change","ui/components/AppShell.tsx"); await apply();
+  onChange("change","ui/app/AppShell.tsx"); await apply();
   assert.equal(reloads,2); assert.equal(cleanups,2);
   failBuild = true;
-  onChange("change","ui/components/AppShell.tsx"); await apply();
+  onChange("change","ui/app/AppShell.tsx"); await apply();
   assert.equal(builds,3); assert.equal(reloads,2); assert.equal(cleanups,2);
   onChange("change","core/queue.mjs"); await apply();
   assert.equal(queue.running.size,1);

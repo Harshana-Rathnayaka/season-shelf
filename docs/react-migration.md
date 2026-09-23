@@ -42,3 +42,8 @@ The built Library and Downloads views were inspected in Chrome, including sample
 queue controls and dark/light themes. Live Telegram and installer execution have
 not been exercised during these migration stages.
 Steps 4–6 remain; no migration release has been published.
+
+The renderer now uses feature folders: Library and Downloads each own their page,
+components, actions, selectors and types. Common controls live in `shared/ui`,
+formatting in `shared/lib`, and composition in `app`. Settings, Help and discovery
+also have feature homes for the remaining migration. See [architecture](architecture.md).

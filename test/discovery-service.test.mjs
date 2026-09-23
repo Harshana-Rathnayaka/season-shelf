@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Discovery } from "../src/desktop/discovery.mjs";
 import { Api } from "teleproto";
-import { advanceDiscovery } from "../src/ui/discovery-flow.mjs";
+import { advanceDiscovery } from "../src/ui/features/discovery/flow.mjs";
 
 function fixture(client) {
   let time=0;

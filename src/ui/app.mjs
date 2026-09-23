@@ -1,12 +1,11 @@
-import { pendingDownloadCount } from "./models/downloads.mjs";
+import { pendingDownloadCount } from "./models/downloads.ts";
 import { escape, friendlyError } from "./format.mjs";
 import { chosen, visible, selectedItems, effectiveQuality } from "./models/library.mjs";
 import { library } from "./pages/library.mjs";
-import { queuePage } from "./pages/downloads.mjs";
 import { helpPage } from "./pages/help.mjs";
 import { settingsPage, usageTiles } from "./pages/settings.mjs";
 import { createRenderer } from "./react-renderer.tsx";
-import { handleDownloadAction, isDownloadAction } from "./actions/downloads.mjs";
+import { handleDownloadCommand, legacyDownloadCommand } from "./actions/downloads.ts";
 import { missingEpisodes } from "../core/collection.mjs";
 import { applyAppearance, appearanceValues, previewAppearance } from "./appearance.mjs";
 import { advanceDiscovery } from "./discovery-flow.mjs";
@@ -15,7 +14,10 @@ import { channelCategory, defaultHiddenKeywords, cleanKeywords } from "../core/c
 import { demoCatalogue } from "./demo.mjs";
 
 const $ = (selector) => document.querySelector(selector);
-const renderer = createRenderer(document.getElementById("app"));
+const renderer = createRenderer(document.getElementById("app"), {
+  onDownloadAction: dispatchDownload,
+  onBrowse: () => { state.page = "library"; render(); },
+});
 const state = {
   updates: {state:"idle"},
   page: "library",
@@ -108,7 +110,7 @@ function render() {
   $("#app").classList.toggle("sidebar-collapsed", !!state.settings.sidebarCollapsed);
   const count = pendingDownloadCount(state.jobs);
   $("#app").classList.toggle("custom-titlebar", !!state.customTitleBar);
-  const content = state.page === "library" ? library(state, !!window.shelf) : state.page === "settings" ? settingsPage(state) : state.page === "help" ? helpPage() : queuePage(state);
+  const content = state.page === "library" ? library(state, !!window.shelf) : state.page === "settings" ? settingsPage(state) : state.page === "help" ? helpPage() : "";
   renderer.render(state, content, count);
   if (state.page === "library")
     $("#select-all")?.setAttribute("aria-label", "Select all visible episodes");
@@ -255,12 +257,23 @@ async function setSettings(patch) {
   render();
 }
 
-document.addEventListener("click", async (event) => {
+async function dispatchDownload(command) {
+  try {
+    await handleDownloadCommand(command, { state, call, render, toast, modal, closeDialog: () => $("#dialog").close() });
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+document.addEventListener("click", (event) => {
   if (!event.target.closest?.(".account-popover, .profile")) {
     const menu = $("#account-popover");
     if (menu) menu.hidden = true;
     $(".profile")?.setAttribute("aria-expanded","false");
   }
+}, true);
+
+document.addEventListener("click", async (event) => {
   const row = event.target.closest?.("[data-episode-row]");
   if (row && !event.target.closest?.("input, button, a") && !window.getSelection()?.toString()) {
     const id = row.dataset.episodeRow;
@@ -273,8 +286,9 @@ document.addEventListener("click", async (event) => {
   event.preventDefault();
   const action = el.dataset.action;
   try {
-    if (isDownloadAction(action)) {
-      await handleDownloadAction(action, el, {state, call, render, toast, modal, document});
+    const downloadCommand = legacyDownloadCommand(action, el.dataset);
+    if (downloadCommand) {
+      await dispatchDownload(downloadCommand);
       return;
     }
     if (action === "confirmation-reply") {

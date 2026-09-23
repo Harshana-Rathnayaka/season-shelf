@@ -382,7 +382,7 @@ test('Finished removes history separately from disk deletion and Downloads defau
   assert.equal(f.document.querySelectorAll('.queue-item').length,0);
   f.click('[data-page="library"]');
   f.click('[data-page="queue"]');
-  assert.equal(f.document.querySelector('[data-tab="ongoing"]').getAttribute('aria-pressed'),'true');
+  assert.equal(f.document.querySelector('[data-tab="ongoing"]').getAttribute('aria-selected'),'true');
 });
 
 test('completed live downloads move from Ongoing into Finished',async t=>{
@@ -508,4 +508,68 @@ test('React shell renders account names as text and preserves navigation focus',
   settings.click();
   assert.equal(f.document.activeElement, settings);
   assert.match(settings.className, /active/);
+});
+
+test('React download rows retain DOM, focus and scroll through live progress updates', async t => {
+  const job = { id: 'live', series: 'Show', status: 'downloading', mode: 'archive', received: 10, item: { filename: 'Show.S01E01.mkv', size: 100, season: 1, episode: 1 } };
+  const f = await fixture(t, { jobs: [job], channels: [], settings: { theme: 'dark' } });
+  f.click('[data-page="queue"]');
+  const row = f.document.querySelector('[data-download-id="live"]');
+  const control = row.querySelector('[data-control="pause"]');
+  const pane = f.document.querySelector('.workspace-scroll');
+  control.focus();
+  pane.scrollTop = 120;
+  f.emit({ type: 'queue', data: [{ ...job, received: 60, speed: 20 }] });
+  assert.equal(f.document.querySelector('[data-download-id="live"]'), row);
+  assert.equal(f.document.activeElement, control);
+  assert.equal(row.querySelector('progress').value, 60);
+  assert.equal(pane.scrollTop, 120);
+});
+
+test('Download tabs support keyboard navigation and reset the view scroll', async t => {
+  const f = await fixture(t);
+  f.click('[data-page="queue"]');
+  const ongoing = f.document.querySelector('[data-tab="ongoing"]');
+  const finished = f.document.querySelector('[data-tab="finished"]');
+  ongoing.focus();
+  f.document.querySelector('.workspace-scroll').scrollTop = 120;
+  ongoing.dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert.equal(f.document.activeElement, finished);
+  assert.equal(finished.getAttribute('aria-selected'), 'true');
+  assert.equal(ongoing.tabIndex, -1);
+  assert.equal(f.document.querySelector('[role="tabpanel"]').getAttribute('aria-labelledby'), finished.id);
+  assert.equal(f.document.querySelector('.workspace-scroll').scrollTop, 0);
+  finished.dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+  assert.equal(f.document.activeElement, ongoing);
+  assert.equal(ongoing.getAttribute('aria-selected'), 'true');
+});
+
+test('Download actions send one request while pending and recover from errors', async t => {
+  const job = { id: 'live', series: 'Show', status: 'downloading', mode: 'archive', item: { filename: 'episode.mkv', size: 100 } };
+  let reject;
+  const f = await fixture(t, { jobs: [job], settings: { theme: 'dark' } }, () => new Promise((_resolve, fail) => { reject = fail; }));
+  f.click('[data-page="queue"]');
+  const button = f.document.querySelector('.queue-item [data-control="pause"]');
+  button.click();
+  button.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(button.disabled, true);
+  assert.equal(button.getAttribute('aria-busy'), 'true');
+  f.emit({ type: 'queue', data: [{ ...job, received: 50 }] });
+  button.click();
+  assert.equal(f.calls.filter(call => call.method === 'queue-control').length, 1);
+  reject(new Error('Connection temporarily unavailable'));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(button.disabled, false);
+  assert.match(f.document.querySelector('#toast').textContent, /Connection temporarily unavailable/);
+  assert.equal(f.document.querySelector('progress[aria-label^="Download progress"]').value, 50);
+});
+
+test('Saving phase explains disk transfer and prevents clearing finishing files', async t => {
+  const f = await fixture(t, { jobs: [{ id: 'saving', series: 'Show', status: 'transferring', mode: 'archive', received: 100, item: { filename: 'episode.mkv', size: 100 } }] });
+  f.click('[data-page="queue"]');
+  assert.equal(f.document.querySelector('.status').textContent, 'Saving to disk');
+  assert.match(f.document.querySelector('.download-phase').textContent, /next download can start/);
+  assert.equal(f.document.querySelector('[data-action="delete-all-queue"]').disabled, true);
+  assert.equal(f.document.querySelector('.queue-item [data-control="remove"]'), null);
 });

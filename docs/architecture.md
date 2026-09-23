@@ -1,7 +1,9 @@
 # Code organization
 
 Season Shelf is migrating to React and TypeScript. The shell and navigation are
-React components checked with strict TypeScript. Existing pages still use
+React components checked with strict TypeScript. Downloads also uses typed React
+components and command handlers; its records and IPC contracts live in `src/ui/types/`.
+Library, Settings and Help still use
 JavaScript HTML renderers through an explicit `LegacyPage` boundary. See the
 [migration plan](react-migration.md) for the remaining steps.
 

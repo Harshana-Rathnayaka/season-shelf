@@ -164,6 +164,16 @@ progress::-webkit-progress-value {
   margin-top: 9px;
   font-size:calc(12px * var(--font-scale, 1));
 }
+.download-phase {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: calc(12px * var(--font-scale, 1));
+}
+.download-tabs [role="tab"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .job-path {
   font-size:calc(11px * var(--font-scale, 1));
   color: var(--muted);

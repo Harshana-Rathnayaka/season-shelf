@@ -28,4 +28,9 @@ Vite production assets, Electron/package wiring, rebuild-before-reload, and
 esbuild-based tests/offline preview. All 135 tests pass, type checking and the
 production build pass, and the built sample interface was inspected in Chrome.
 Desktop installer execution and live Telegram were not exercised in this stage.
-Steps 2–6 remain; no migration release has been published.
+Step 2 is implemented: Downloads now uses typed React tabs, rows and controls,
+typed commands and download IPC contracts. Stable keyed rows preserve focus and
+scroll during progress updates; pending controls prevent duplicate requests.
+Saving and verification phases have readable explanations. All 139 tests pass.
+File details and Settings still use an explicit legacy action adapter.
+Steps 3–6 remain; no migration release has been published.

@@ -56,6 +56,7 @@ app
       import("./telegram.mjs"),
       import("../core/catalog.mjs"),
     ]);
+    const { isWithin } = await import("../core/paths.mjs");
     const {cleanAppearance} = await import("../core/appearance.mjs");
     await fs.mkdir(app.getPath("userData"), {recursive:true});
     store = new Store(path.join(app.getPath("userData"), "shelf.sqlite"));
@@ -293,8 +294,8 @@ app
         if (
           other &&
           (root.path === other.path ||
-            root.path.startsWith(other.path + path.sep) ||
-            other.path.startsWith(root.path + path.sep))
+            isWithin(other.path, root.path) ||
+            isWithin(root.path, other.path))
         )
           throw new Error(
             "Choose separate, non-overlapping Archive and Watch folders",

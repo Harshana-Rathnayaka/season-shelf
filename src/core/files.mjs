@@ -1,3 +1,4 @@
+import { isWithin } from "./paths.mjs";
 import fs from "node:fs/promises";
 import { createReadStream, constants } from "node:fs";
 import path from "node:path";
@@ -27,7 +28,7 @@ export async function registerRoot(root, knownRoots = []) {
     throw new Error("Invalid destination marker");
   return { path: real, id: identity.id, identity: fingerprint };
 }
-export async function checkRoot(root, needed = 0) {
+export async function checkRoot(root, needed = 0, { requireSpace = true } = {}) {
   try {
     if (root.identity) {
       const actual = await directoryIdentity(root.path);
@@ -39,7 +40,7 @@ export async function checkRoot(root, needed = 0) {
     }
     const stats = await fs.statfs(root.path);
     const available = Number(stats.bavail) * Number(stats.bsize);
-    if (available < needed + 64 * 1024 ** 2)
+    if (requireSpace && available < needed + 64 * 1024 ** 2)
       throw new Error("Not enough free space at destination");
     return available;
   } catch (error) {
@@ -79,11 +80,11 @@ export async function hashFile(filename) {
 export async function publishFile({ source, root, parts, id, expectedHash }) {
   await checkRoot(root, (await fs.stat(source)).size);
   const final = path.resolve(root.path, ...parts);
-  if (!final.startsWith(path.resolve(root.path) + path.sep))
+  if (!isWithin(root.path, final))
     throw new Error("Unsafe destination");
   await fs.mkdir(path.dirname(final), { recursive: true });
   const realParent = await fs.realpath(path.dirname(final));
-  if (!realParent.startsWith(path.resolve(root.path) + path.sep))
+  if (!isWithin(root.path, realParent, { allowRoot: true }))
     throw new Error("Destination resolves outside selected folder");
   try {
     await fs.access(final);

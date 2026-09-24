@@ -209,8 +209,10 @@ export class TelegramAdapter {
           throw result.error;
         }
         combined.throwIfAborted();
-        yield result.data;
+        // Refill before the consumer writes to disk so network and staging I/O overlap.
+        // Pending memory remains bounded by source.window plus the yielded chunk.
         fill();
+        yield result.data;
       }
     } finally { controller.abort();await Promise.allSettled(pending.values()); }
   }

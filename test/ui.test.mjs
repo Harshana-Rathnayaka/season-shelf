@@ -18,7 +18,7 @@ async function fixture(t, bootstrap = null, handler = null) {
     if (handler && method !== "bootstrap") return {ok:true,data:await handler(method,payload)};
     return {ok:true,data:method === "bootstrap" ? {...bootstrap,connected:true,demo:false} : []};
   } };
-  window.matchMedia = () => ({ matches: true, addEventListener() {} });
+  window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
   window.HTMLDialogElement.prototype.showModal = function () {
     this.open = true;
   };
@@ -139,6 +139,7 @@ test("suggested channels retain show names; All channels restores hidden finance
   const input=f.document.querySelector('#channel-search');
   input.value='forex';
   input.dispatchEvent(new f.window.Event('input',{bubbles:true}));
+  await new Promise(resolve=>setTimeout(resolve,20));
   assert.equal(f.document.querySelectorAll('.channel-option').length,1);
   f.click('[data-action="channel-filter"][data-filter="suggested"]');
   assert.match(f.document.querySelector('#channel-results').textContent,/Try All channels/);
@@ -165,6 +166,7 @@ test("season navigation scrolls overflowing tabs and keyboard End reaches the la
   const tabs=f.document.querySelector('.season-tabs');
   Object.defineProperties(tabs,{clientWidth:{value:300},scrollWidth:{value:2000}});
   f.window.dispatchEvent(new f.window.Event('resize'));
+  await new Promise(resolve => setTimeout(resolve, 20));
   f.click('.season-next');
   assert.equal(tabs.scrollLeft,225);
   f.document.querySelector('[data-action="season"]').dispatchEvent(new f.window.KeyboardEvent('keydown',{key:'End',bubbles:true}));
@@ -259,7 +261,7 @@ test("discovery sends only a submitted query and continues after explicit result
     if(method==='discovery-source') return {source:{id:'source-token',title:'MovieClubFamily Chat',linked:true}};
     if(method==='discovery-search') return {messages:[{text:'Choose a result',links:[{id:'choice',label:'Banshee',kind:'public-peer'}]}]};
     if(method==='discovery-follow') return {channel:{id:'choice',title:'Banshee'}};
-    if(method==='discovery-join') return {channel:{id:'joined'},channels:[]};
+    if(method==='discovery-join') return {channel:{id:'joined',title:'Banshee'},channels:[]};
     if(method==='scan') return {channel:{id:'joined',title:'Banshee'},items:[]};
     return [];
   });
@@ -317,13 +319,20 @@ test("all pages keep their heading outside the scroll pane and retain position o
 test("account button opens an anchored popup with logout without navigating",async(t)=>{
   const f=await fixture(t,{settings:{theme:'dark'},profile:{name:'Anonymous',username:'D3M0NHA2H'},jobs:[],channels:[]});
   f.click('.profile');
+  await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(f.document.querySelector('#account-popover').hidden,false);
   assert.ok(f.document.querySelector('.library-shell'));
   assert.match(f.document.querySelector('#account-popover').textContent,/@D3M0NHA2H/);
   assert.ok(f.document.querySelector('#account-popover [data-action="disconnect"]'));
   f.document.dispatchEvent(new f.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+  await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(f.document.querySelector('#account-popover').hidden,true);
+  assert.equal(f.document.activeElement,f.document.querySelector('.profile'));
+  f.click('.profile');
+  await new Promise(resolve=>setTimeout(resolve,0));
   f.click('[data-page="settings"]');
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(f.document.querySelector('#account-popover').hidden,true);
   assert.doesNotMatch(f.document.querySelector('main').textContent,/shade of dark|Anonymous \? @/);
 });
 
@@ -382,7 +391,7 @@ test('Finished removes history separately from disk deletion and Downloads defau
   assert.equal(f.document.querySelectorAll('.queue-item').length,0);
   f.click('[data-page="library"]');
   f.click('[data-page="queue"]');
-  assert.equal(f.document.querySelector('[data-tab="ongoing"]').getAttribute('aria-pressed'),'true');
+  assert.equal(f.document.querySelector('[data-tab="ongoing"]').getAttribute('aria-selected'),'true');
 });
 
 test('completed live downloads move from Ongoing into Finished',async t=>{
@@ -479,4 +488,245 @@ test('development updates explain why checks are unavailable without a misleadin
   assert.equal(f.document.querySelector('[data-action="update-check"]').disabled,true);
   assert.equal(f.document.querySelector('.update-last-checked'),null);
   assert.match(f.document.querySelector('#update-status').textContent,/disabled in development/);
+});
+
+test('React shell updates queue badges without replacing focused page controls', async t => {
+  const f = await fixture(t, { settings: { theme: 'dark' }, jobs: [], channels: [] });
+  f.click('[data-page="settings"]');
+  const input = f.document.querySelector('input');
+  assert.ok(input);
+  input.focus();
+  const before = f.document.querySelector('main').firstChild;
+  const job = { id: 'active', status: 'downloading', series: 'Show', mode: 'archive', item: { filename: 'episode.mkv', size: 100 } };
+  f.emit({ type: 'queue', data: [job] });
+  assert.equal(f.document.querySelector('.nav-count').textContent, '1');
+  assert.equal(f.document.activeElement, input);
+  assert.equal(f.document.querySelector('main').firstChild, before);
+  f.emit({ type: 'queue', data: [] });
+  assert.equal(f.document.querySelector('.nav-count'), null);
+  assert.equal(f.document.activeElement, input);
+});
+
+test('React shell renders account names as text and preserves navigation focus', async t => {
+  const name = '<img src=x onerror=alert(1)>';
+  const f = await fixture(t, { settings: { theme: 'dark' }, jobs: [], channels: [], profile: { name } });
+  assert.equal(f.document.querySelector('.profile strong').textContent, name);
+  assert.equal(f.document.querySelector('.profile img'), null);
+  const settings = f.document.querySelector('[data-page="settings"]');
+  settings.focus();
+  settings.click();
+  assert.equal(f.document.activeElement, settings);
+  assert.match(settings.className, /active/);
+});
+
+test('React download rows retain DOM, focus and scroll through live progress updates', async t => {
+  const job = { id: 'live', series: 'Show', status: 'downloading', mode: 'archive', received: 10, item: { filename: 'Show.S01E01.mkv', size: 100, season: 1, episode: 1 } };
+  const f = await fixture(t, { jobs: [job], channels: [], settings: { theme: 'dark' } });
+  f.click('[data-page="queue"]');
+  const row = f.document.querySelector('[data-download-id="live"]');
+  const control = row.querySelector('[data-control="pause"]');
+  const pane = f.document.querySelector('.workspace-scroll');
+  control.focus();
+  pane.scrollTop = 120;
+  f.emit({ type: 'queue', data: [{ ...job, received: 60, speed: 20 }] });
+  assert.equal(f.document.querySelector('[data-download-id="live"]'), row);
+  assert.equal(f.document.activeElement, control);
+  assert.equal(row.querySelector('progress').value, 60);
+  assert.equal(pane.scrollTop, 120);
+});
+
+test('Download tabs support keyboard navigation and reset the view scroll', async t => {
+  const f = await fixture(t);
+  f.click('[data-page="queue"]');
+  const ongoing = f.document.querySelector('[data-tab="ongoing"]');
+  const finished = f.document.querySelector('[data-tab="finished"]');
+  ongoing.focus();
+  f.document.querySelector('.workspace-scroll').scrollTop = 120;
+  ongoing.dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert.equal(f.document.activeElement, finished);
+  assert.equal(finished.getAttribute('aria-selected'), 'true');
+  assert.equal(ongoing.tabIndex, -1);
+  assert.equal(f.document.querySelector('[role="tabpanel"]').getAttribute('aria-labelledby'), finished.id);
+  assert.equal(f.document.querySelector('.workspace-scroll').scrollTop, 0);
+  finished.dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+  assert.equal(f.document.activeElement, ongoing);
+  assert.equal(ongoing.getAttribute('aria-selected'), 'true');
+});
+
+test('Download actions send one request while pending and recover from errors', async t => {
+  const job = { id: 'live', series: 'Show', status: 'downloading', mode: 'archive', item: { filename: 'episode.mkv', size: 100 } };
+  let reject;
+  const f = await fixture(t, { jobs: [job], settings: { theme: 'dark' } }, () => new Promise((_resolve, fail) => { reject = fail; }));
+  f.click('[data-page="queue"]');
+  const button = f.document.querySelector('.queue-item [data-control="pause"]');
+  button.click();
+  button.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(button.disabled, true);
+  assert.equal(button.getAttribute('aria-busy'), 'true');
+  f.emit({ type: 'queue', data: [{ ...job, received: 50 }] });
+  button.click();
+  assert.equal(f.calls.filter(call => call.method === 'queue-control').length, 1);
+  reject(new Error('Connection temporarily unavailable'));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(button.disabled, false);
+  assert.match(f.document.querySelector('#toast').textContent, /Connection temporarily unavailable/);
+  assert.equal(f.document.querySelector('progress[aria-label^="Download progress"]').value, 50);
+});
+
+test('Saving phase explains disk transfer and prevents clearing finishing files', async t => {
+  const f = await fixture(t, { jobs: [{ id: 'saving', series: 'Show', status: 'transferring', mode: 'archive', received: 100, item: { filename: 'episode.mkv', size: 100 } }] });
+  f.click('[data-page="queue"]');
+  assert.equal(f.document.querySelector('.status').textContent, 'Saving to disk');
+  assert.match(f.document.querySelector('.download-phase').textContent, /next download can start/);
+  assert.equal(f.document.querySelector('[data-action="delete-all-queue"]').disabled, true);
+  assert.equal(f.document.querySelector('.queue-item [data-control="remove"]'), null);
+});
+
+test('React library search retains its input and caret while filtering rows', async t => {
+  const f = await fixture(t);
+  const input = f.document.querySelector('#episode-search');
+  input.focus();
+  input.value = 'Episode 5';
+  input.setSelectionRange(4, 4);
+  input.dispatchEvent(new f.window.Event('input', { bubbles: true }));
+  assert.equal(f.document.querySelector('#episode-search'), input);
+  assert.equal(f.document.activeElement, input);
+  assert.equal(input.selectionStart, 4);
+  assert.equal(f.document.querySelectorAll('[data-episode-row]').length, 1);
+  assert.match(f.document.querySelector('[data-episode-row]').textContent, /Episode 5/);
+});
+
+test('React library retains selected rows and exposes partial selection', async t => {
+  const f = await fixture(t);
+  const row = f.document.querySelector('[data-episode-row]');
+  const checkbox = row.querySelector('input');
+  const all = f.document.querySelector('#select-all');
+  assert.equal(all.indeterminate, true);
+  checkbox.focus();
+  checkbox.click();
+  assert.equal(f.document.querySelector('[data-episode-row]'), row);
+  assert.equal(f.document.activeElement, checkbox);
+  assert.equal(checkbox.checked, false);
+  assert.match(f.document.querySelector('.selection-bar').textContent, /2 episodes selected/);
+  all.click();
+  assert.equal(all.checked, true);
+  assert.equal(all.indeterminate, false);
+  assert.match(f.document.querySelector('.selection-bar').textContent, /8 episodes selected/);
+  all.click();
+  assert.match(f.document.querySelector('.selection-bar').textContent, /0 episodes selected/);
+  assert.equal(all.indeterminate, false);
+});
+
+test('Settings retain unsaved form values and focus during usage and update events', async t => {
+  const f=await fixture(t,{settings:{theme:'dark',transfer:{start:'22:00',end:'06:00'}},jobs:[],channels:[]},async()=>({state:'idle'}));
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  const input=f.document.querySelector('[name="speedKiB"]');
+  const keywords=f.document.querySelector('#hidden-keywords');
+  input.value='777'; keywords.value='unsaved filter'; input.focus();
+  f.emit({type:'usage',data:{payloadBytes:2097152,publishedBytes:0,completedFiles:0}});
+  f.emit({type:'updates',data:{state:'current'}});
+  assert.equal(f.document.querySelector('[name="speedKiB"]'),input);
+  assert.equal(input.value,'777'); assert.equal(keywords.value,'unsaved filter');
+  assert.equal(f.document.activeElement,input);
+  assert.match(f.document.querySelector('#usage-summary').textContent,/2.0 MB/);
+});
+
+test('Settings failed saves preserve drafts and prevent duplicate submissions', async t => {
+  let reject;
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async method=>method==='settings'?new Promise((_resolve,fail)=>{reject=fail;}):{state:'idle'});
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  const form=f.document.querySelector('#keyword-form');
+  form.elements.keywords.value='keep this draft';
+  for(let i=0;i<2;i++)form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.filter(c=>c.method==='settings').length,1);
+  assert.equal(form.querySelector('[type="submit"]').disabled,true);
+  reject(new Error('Could not save preferences'));
+  await new Promise(r=>setTimeout(r,20));
+  assert.equal(form.elements.keywords.value,'keep this draft');
+  assert.equal(form.querySelector('[type="submit"]').disabled,false);
+  assert.match(f.document.querySelector('#toast').textContent,/Could not save preferences/);
+});
+
+test('React confirmation Escape cancels once and treats server text as text', async t => {
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async()=>({}));
+  f.emit({type:'confirmation',data:{id:'confirm',title:'<img src=x>',message:'Keep or remove?',detail:'Completed files stay on disk.',buttons:['Keep','Remove']}});
+  const dialog=f.document.querySelector('#dialog');
+  assert.equal(dialog.querySelector('h2').textContent,'<img src=x>');
+  assert.equal(dialog.querySelector('img'),null);
+  assert.equal(dialog.getAttribute('aria-labelledby'),dialog.querySelector('h2').id);
+  dialog.dispatchEvent(new f.window.Event('cancel',{cancelable:true}));
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(dialog.open,false);
+  assert.deepEqual(f.calls.filter(c=>c.method==='confirmation-reply').map(c=>({id:c.payload.id,response:c.payload.response})),[{id:'confirm',response:0}]);
+});
+
+test('Closing discovery ignores a late response instead of reopening the dialog', async t => {
+  let finish;
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async method=>method==='discovery-source'?new Promise(resolve=>{finish=resolve;}):{});
+  f.click('[data-action="choose-series"]');f.click('[data-action="discover"]');f.click('[data-action="discovery-source"]');
+  f.click('[data-action="close-dialog"]');await new Promise(resolve=>setTimeout(resolve,0));
+  finish({source:{id:'late',title:'Late group'}});
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(f.document.querySelector('#dialog').open,false);
+  assert.equal(f.document.querySelector('#discovery-form'),null);
+  assert.equal(f.calls.filter(c=>c.method==='discovery-cancel').length,1);
+});
+
+test('Closing an authentication prompt cancels it and removes credential controls', async t => {
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async()=>({}));
+  f.emit({type:'auth-prompt',data:{id:'auth',label:'Two-step verification',kind:'password'}});
+  f.document.querySelector('#auth-form input').value='test-only-secret';
+  f.click('[data-action="close-dialog"]');await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(f.document.querySelector('#auth-form'),null);
+  assert.equal(f.document.querySelector('#dialog').open,false);
+  assert.deepEqual(f.calls.filter(c=>c.method==='auth-reply').map(c=>({id:c.payload.id,cancel:c.payload.cancel})),[{id:'auth',cancel:true}]);
+});
+
+test('scan progress survives background renders and resets for the next scan',async t=>{
+  const item=parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:100});
+  const catalogue={channel:{id:'show',title:'Show'},items:[item]};
+  let finishScan;
+  const f=await fixture(t,{catalogue,channels:[catalogue.channel],jobs:[],settings:{theme:'dark'}},async method=>{
+    if(method==='scan')return new Promise(resolve=>{finishScan=()=>resolve(catalogue);});
+    return [];
+  });
+  f.click('[data-action="rescan"]');
+  f.emit({type:'scan-progress',data:{scanned:250,found:12}});
+  assert.match(f.document.querySelector('#scan-status').textContent,/250 messages checked.*12 episode files found/);
+  f.emit({type:'queue',data:[]});
+  assert.match(f.document.querySelector('#scan-status').textContent,/250 messages checked/);
+  finishScan();
+  await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(f.document.querySelector('#scan-status'),null);
+  f.emit({type:'scan-progress',data:{scanned:999,found:90}});
+  f.click('[data-action="rescan"]');
+  assert.equal(f.document.querySelector('#scan-status').textContent,'Scanning channel metadata…');
+  finishScan();
+  await new Promise(resolve=>setTimeout(resolve,20));
+});
+
+test('invalid desktop events leave the last valid queue and lifetime totals intact',async t=>{
+  const job={id:'active',series:'Show',mode:'archive',status:'downloading',item:{filename:'episode.mkv',size:100},received:20};
+  const f=await fixture(t,{jobs:[job],usage:{payloadBytes:1048576,publishedBytes:0,completedFiles:0},settings:{theme:'dark'}});
+  f.click('[data-page="queue"]');
+  const row=f.document.querySelector('.queue-item');
+  f.emit({type:'queue',data:[{...job,item:{filename:'bad.mkv',size:'invalid'}}]});
+  assert.equal(f.document.querySelector('.queue-item'),row);
+  assert.match(row.textContent,/episode.mkv/);
+  assert.match(f.document.querySelector('#toast').textContent,/invalid data/);
+  f.emit({type:'usage',data:{payloadBytes:Infinity}});
+  f.click('[data-page="settings"]');
+  assert.match(f.document.querySelector('#usage-summary').textContent,/1.0 MB/);
+  f.emit({type:'updates',data:{state:'idle',lastCheckedAt:null}});
+  assert.match(f.document.querySelector('main').textContent,/Last checked: Never/);
+});
+
+test('bootstrap only applies desktop-owned fields',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[],page:'injected',selected:['invalid'],demo:true});
+  assert.ok(f.document.querySelector('.library-shell'));
+  assert.equal(f.document.querySelector('.demo-pill'),null);
+  f.click('[data-page="queue"]');
+  assert.ok(f.document.querySelector('[data-action="download-tab"][data-tab="ongoing"]'));
 });

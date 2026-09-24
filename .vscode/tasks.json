@@ -1,6 +1,7 @@
 {
   "version": "2.0.0",
   "tasks": [
+    {"label": "Build renderer", "type": "npm", "script": "build", "problemMatcher": []},
     {"label": "Install dependencies", "type": "shell", "command": "npm", "args": ["ci"], "windows": {"command": "npm.cmd"}, "problemMatcher": []},
     {"label": "Check JavaScript", "type": "npm", "script": "check", "group": "build", "problemMatcher": []},
     {"label": "Run tests", "type": "npm", "script": "test", "group": "test", "problemMatcher": []}

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { advanceDiscovery } from "../src/ui/discovery-flow.mjs";
+import { advanceDiscovery } from "../src/ui/features/discovery/flow.ts";
 
 test("sole series result starts its bot then joins; multiple results stop for selection",async()=>{
   const calls=[];

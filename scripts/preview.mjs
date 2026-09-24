@@ -3,11 +3,12 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-const root = fileURLToPath(new URL("../src/", import.meta.url));
+const root = fileURLToPath(new URL("../dist/ui/", import.meta.url));
 const types = {
   ".html": "text/html",
   ".css": "text/css",
   ".mjs": "text/javascript",
+  ".js": "text/javascript",
   ".svg": "image/svg+xml",
   ".ttf": "font/ttf",
 };
@@ -18,13 +19,9 @@ const server = http.createServer(async (req, res) => {
     );
     const target = path.resolve(
       root,
-      "." + (pathname === "/" ? "/ui/index.html" : pathname),
+      "." + (pathname === "/" || pathname === "/ui/index.html" ? "/index.html" : pathname),
     );
-    if (
-      !target.startsWith(root) ||
-      (!target.startsWith(path.join(root, "ui") + path.sep) &&
-        !["core/catalog.mjs", "core/collection.mjs", "core/progress.mjs", "core/appearance.mjs"].some(file => target === path.join(root, file)))
-    ) {
+    if (!target.startsWith(root)) {
       res.writeHead(403);
       return res.end();
     }
@@ -40,5 +37,5 @@ const server = http.createServer(async (req, res) => {
   }
 });
 server.listen(4173, "127.0.0.1", () =>
-  console.log("Sample preview: http://127.0.0.1:4173/ui/index.html"),
+  console.log("Sample preview: http://127.0.0.1:4173/"),
 );

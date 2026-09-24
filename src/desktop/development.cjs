@@ -2,10 +2,15 @@ const { watch } = require("node:fs");
 const path = require("node:path");
 const { Menu } = require("electron");
 
-exports.enableDevelopment = ({ app, win, beforeReload = () => {} }) => {
-  let uiChanged = false, backendChanged = false, debounce, restarting = false;
-  const applyChanges = () => {
-    if (restarting) return;
+async function buildRenderer() {
+  const { build } = await import("vite");
+  await build({ configFile: path.join(__dirname, "../../vite.config.ts") });
+}
+
+exports.enableDevelopment = ({ app, win, beforeReload = () => {}, rebuild = buildRenderer }) => {
+  let uiChanged = false, backendChanged = false, debounce, restarting = false, building = false;
+  const applyChanges = async () => {
+    if (restarting || building) return;
     if (backendChanged) {
       // Request normal shutdown now; the shared quit handler stops active work.
       restarting = true;
@@ -14,12 +19,23 @@ exports.enableDevelopment = ({ app, win, beforeReload = () => {} }) => {
       app.quit();
     } else if (uiChanged && !win.isDestroyed()) {
       uiChanged = false;
-      beforeReload();
-      win.webContents.reloadIgnoringCache();
+      building = true;
+      try {
+        await rebuild();
+        if (!win.isDestroyed()) {
+          beforeReload();
+          win.webContents.reloadIgnoringCache();
+        }
+      } catch (error) {
+        console.error("Renderer build failed:", error.message);
+      } finally {
+        building = false;
+        if (uiChanged || backendChanged) debounce = setTimeout(applyChanges, 350);
+      }
     }
   };
   const watcher = watch(path.join(__dirname, ".."), { recursive: true }, (_event, name) => {
-    if (!name || !/\.(css|html|mjs|cjs)$/.test(name)) return;
+    if (!name || !/\.(css|html|mjs|cjs|ts|tsx)$/.test(name)) return;
     if (name.replaceAll("\\", "/").startsWith("ui/")) uiChanged = true;
     else {
       backendChanged = true;

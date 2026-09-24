@@ -215,7 +215,7 @@ test("resume discards an incomplete tail and writes at the retained offset", asy
   assert.ok((await fs.readFile(job.finalPath)).equals(f.data), "Resumed bytes changed");
 });
 
-test("missing HDD marker waits without downloading", async (t) => {
+test("replaced destination waits without downloading", async (t) => {
   const f = await fixture(t);
   f.queue.concurrency = 0;
   await f.queue.add({
@@ -224,7 +224,8 @@ test("missing HDD marker waits without downloading", async (t) => {
     mode: "archive",
     root: f.root,
   });
-  await fs.rm(path.join(f.root.path, ".season-shelf-root.json"));
+  await fs.rename(f.root.path, f.root.path + "-original");
+  await fs.mkdir(f.root.path);
   f.queue.concurrency = 2;
   f.queue.pump();
   await settle(f.queue);

@@ -46,7 +46,7 @@ app
     const [
       { Store },
       { DownloadQueue },
-      { registerRoot },
+      { registerRoot, migrateDestinationRoots },
       { TelegramAdapter },
       { selectEpisodes, defaultHiddenKeywords, cleanKeywords },
     ] = await Promise.all([
@@ -59,6 +59,7 @@ app
     const {cleanAppearance} = await import("../core/appearance.mjs");
     await fs.mkdir(app.getPath("userData"), {recursive:true});
     store = new Store(path.join(app.getPath("userData"), "shelf.sqlite"));
+    await migrateDestinationRoots(store);
     const notify = (type, data) => {
       if(type==="updates" && data.state==="ready" && !data.deferred && Notification.isSupported()){const notice=new Notification({title:"Season Shelf update ready",body:"Open the app to restart now or install on the next launch."});notice.on("click",()=>{win?.show();win?.focus();});notice.show();}
       if (win && !win.isDestroyed())
@@ -285,7 +286,8 @@ app
         properties: ["openDirectory", "createDirectory"],
       });
       if (!result.canceled) {
-        const root = await registerRoot(result.filePaths[0]);
+        const root = await registerRoot(result.filePaths[0], [settings.archiveRoot, settings.watchRoot,
+          ...queue.jobs.map(job => job.root), ...watcher.watches.map(watch => watch.root)]);
         const other =
           settings[mode === "archive" ? "watchRoot" : "archiveRoot"];
         if (

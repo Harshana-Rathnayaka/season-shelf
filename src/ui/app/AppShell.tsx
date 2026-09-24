@@ -45,7 +45,7 @@ export function AppShell({ state, count, children, onAction }: { state: ShellSta
     <aside className="sidebar" id="workspace-sidebar">
       <button className="icon-button sidebar-toggle" data-action="toggle-sidebar" aria-controls="workspace-sidebar" aria-expanded={!state.settings.sidebarCollapsed} aria-label={sidebarLabel} title={sidebarLabel} onClick={() => void onAction({ action: "toggle-sidebar" })}><Icon name="sidebar" /></button>
       <a className="brand" href="#" data-action="nav" data-page="library" onClick={event => { event.preventDefault(); void onAction({ action: "nav", page: "library" }); }}>
-        <span className="brand-mark"><Icon name="shelf" /></span><span>season<span className="brand-light">shelf</span><small>YOUR SERIES, SORTED.</small></span>
+        <span className="brand-mark"><Icon name="shelf" /></span><span>season<span className="brand-light">shelf</span><small>TELEGRAM DOWNLOADS</small></span>
       </a>
       <div className="nav-label">WORKSPACE</div>
       <nav aria-label="Main navigation">
@@ -53,7 +53,6 @@ export function AppShell({ state, count, children, onAction }: { state: ShellSta
         <NavButton page="queue" glyph="download" current={state.page} count={count} onAction={onAction} />
         <NavButton page="help" glyph="info" current={state.page} onAction={onAction} />
       </nav>
-      <div className="sidebar-note"><span className="tiny-mark"><Icon name="shield" /></span><strong>A little less clicking.</strong><p>More time for the next episode.</p><span className="local-label"><i /> Runs on your computer</span></div>
       <div className="sidebar-bottom" ref={account}>
         <NavButton page="settings" glyph="settings" current={state.page} onAction={navigate} />
         <button className="profile" ref={profile} data-action="account-menu" aria-expanded={menuOpen} aria-controls="account-popover" aria-label="Telegram account" title="Telegram account" onClick={() => setMenuOpen(open => !open)}>

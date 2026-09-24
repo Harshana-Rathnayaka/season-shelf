@@ -1,3 +1,4 @@
+import { PageHeader } from "../../shared/ui/PageHeader";
 import { bytes } from "../../shared/lib/format";
 import { batchProgress } from "../../../core/progress.mjs";
 import { visibleDownloads, pendingDownloadCount } from "./selectors";
@@ -16,11 +17,7 @@ export function DownloadsPage({ state, onAction, onBrowse }: Props) {
   const { total, received, remaining } = batchProgress(state.jobs, state.currentBatchId);
   const speed = jobs.reduce((sum, job) => sum + (job.speed || 0), 0);
   return <main>
-    <section className="simple-heading">
-      <div className="eyebrow">{finished ? "A PLACE FOR EVERYTHING" : "LET THE QUEUE DO ITS THING"}</div>
-      <h1>Downloads, in motion.</h1>
-      <p>{finished ? "Completed downloads, newest first. Removing history keeps your files on disk." : `${state.demo ? "Sample queue · no file transfers" : "Direct from Telegram to your computer"}${speed ? ` · ${bytes(speed)}/s` : ""}`}</p>
-    </section>
+    <PageHeader title="Downloads" description={finished ? "Completed downloads, newest first. Removing history keeps your files on disk." : `${state.demo ? "Sample queue · no file transfers" : "Direct from Telegram to your computer"}${speed ? ` · ${bytes(speed)}/s` : ""}`} />
     <DownloadTabs selected={state.downloadTab} onAction={onAction} />
     <div className="queue-summary">
       <div><small>IN QUEUE</small><strong>{pendingDownloadCount(state.jobs)}</strong></div>

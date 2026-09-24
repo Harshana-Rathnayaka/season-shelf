@@ -1,3 +1,4 @@
+import { PageHeader } from "../../shared/ui/PageHeader";
 import type { SettingsState, SettingsActionHandler, SaveSettings } from "./types";
 import { AppearanceSettings } from "./components/AppearanceSettings";
 import { StorageSettings } from "./components/StorageSettings";
@@ -6,7 +7,7 @@ import { ActivitySettings } from "./components/ActivitySettings";
 import { AboutSettings } from "./components/AboutSettings";
 
 export function SettingsPage({ state, onSave, onAction }: { state: SettingsState; onSave: SaveSettings; onAction: SettingsActionHandler }) {
-  return <main><section className="simple-heading"><div className="eyebrow">MAKE YOURSELF AT HOME</div><h1>A workspace that fits.</h1><p>Make it yours. Keep your downloads organised.</p></section>
+  return <main><PageHeader title="Settings" description="Download preferences, storage and appearance." />
     <section className="settings-panel settings-groups workspace-scroll" tabIndex={0} role="region" aria-label="Settings">
       <AppearanceSettings settings={state.settings} onSave={onSave} onAction={onAction} />
       <StorageSettings state={state} onSave={onSave} onAction={onAction} />

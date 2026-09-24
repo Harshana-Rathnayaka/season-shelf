@@ -1,3 +1,4 @@
+import { PageHeader } from "../../shared/ui/PageHeader";
 import { chosen, seasonsFor } from "./selectors";
 import type { LibraryState, LibraryActionHandler } from "./types";
 import { Icon } from "../../shared/ui/Icon";
@@ -15,10 +16,7 @@ export function LibraryPage({ state, hasDesktop, onAction }: Props) {
   const root = state.settings[state.mode === "archive" ? "archiveRoot" : "watchRoot"];
   const needsReview = state.catalogue?.items.filter(item => item.reason).length || 0;
   return <main>
-    <section className="page-heading">
-      <div><div className="eyebrow">A HOME FOR EVERY EPISODE</div><h1>Your next watch,<br /><span>beautifully organised.</span></h1><p>Pick a series. Choose your quality. We’ll take it from here.</p></div>
-      <div className="orbit-art" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit orbit-three" /><div className="orbit-core"><Icon name="shelf" /></div><span className="orbit-point point-one" /><span className="orbit-point point-two" /><span className="orbit-caption">COLLECT. WATCH. REPEAT.</span></div>
-    </section>
+    <PageHeader title="Series library" description="Choose a channel, select episodes and save them to your folders." />
     <div className="library-preferences">
       <div className="mode-switch" role="group" aria-label="Download destination mode">
         {(["archive", "watch"] as const).map(mode => <button key={mode} type="button" data-action="mode" data-mode={mode} aria-pressed={state.mode === mode} className={state.mode === mode ? "active" : ""}
@@ -52,7 +50,7 @@ export function LibraryPage({ state, hasDesktop, onAction }: Props) {
         </div>
         <EpisodeTable state={state} onAction={onAction} />
         <SelectionBar state={state} onAction={onAction} />
-      </> : <div className="empty-state"><div className="empty-symbol"><Icon name="shelf" /></div><h3>A tidy collection starts here.</h3><p>Connect your account to browse the series channels you can access.</p><div>
+      </> : <div className="empty-state"><div className="empty-symbol"><Icon name="shelf" /></div><h3>Add your first series.</h3><p>Connect your account to browse the series channels you can access.</p><div>
         <LibraryButton label="Connect Telegram" glyph="arrow" className="button primary" command={{ action: "connect" }} onAction={onAction} />
         <LibraryButton label="Explore the interface" className="text-button" command={{ action: "demo" }} onAction={onAction} />
       </div></div>}

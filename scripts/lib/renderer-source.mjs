@@ -3,7 +3,7 @@ import path from "node:path";
 import { build } from "esbuild";
 
 // Bundle the same React/TypeScript entry for JSDOM and the offline preview.
-export async function rendererSource(entry = "src/ui/app/controller.mjs") {
+export async function rendererSource(entry = "src/ui/app/controller.ts") {
   const result = await build({
     entryPoints: [entry], bundle: true, write: false, format: "iife",
     globalName: "SeasonShelfRenderer", platform: "browser", target: "es2022",

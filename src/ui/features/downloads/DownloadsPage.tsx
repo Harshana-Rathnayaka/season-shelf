@@ -1,4 +1,4 @@
-import { bytes } from "../../shared/lib/format.mjs";
+import { bytes } from "../../shared/lib/format";
 import { batchProgress } from "../../../core/progress.mjs";
 import { visibleDownloads, pendingDownloadCount } from "./selectors";
 import type { DownloadsState, DownloadActionHandler } from "./types";

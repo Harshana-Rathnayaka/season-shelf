@@ -18,7 +18,7 @@ async function fixture(t, bootstrap = null, handler = null) {
     if (handler && method !== "bootstrap") return {ok:true,data:await handler(method,payload)};
     return {ok:true,data:method === "bootstrap" ? {...bootstrap,connected:true,demo:false} : []};
   } };
-  window.matchMedia = () => ({ matches: true, addEventListener() {} });
+  window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
   window.HTMLDialogElement.prototype.showModal = function () {
     this.open = true;
   };
@@ -261,7 +261,7 @@ test("discovery sends only a submitted query and continues after explicit result
     if(method==='discovery-source') return {source:{id:'source-token',title:'MovieClubFamily Chat',linked:true}};
     if(method==='discovery-search') return {messages:[{text:'Choose a result',links:[{id:'choice',label:'Banshee',kind:'public-peer'}]}]};
     if(method==='discovery-follow') return {channel:{id:'choice',title:'Banshee'}};
-    if(method==='discovery-join') return {channel:{id:'joined'},channels:[]};
+    if(method==='discovery-join') return {channel:{id:'joined',title:'Banshee'},channels:[]};
     if(method==='scan') return {channel:{id:'joined',title:'Banshee'},items:[]};
     return [];
   });
@@ -497,7 +497,7 @@ test('React shell updates queue badges without replacing focused page controls',
   assert.ok(input);
   input.focus();
   const before = f.document.querySelector('main').firstChild;
-  const job = { id: 'active', status: 'downloading', item: { filename: 'episode.mkv', size: 100 } };
+  const job = { id: 'active', status: 'downloading', series: 'Show', mode: 'archive', item: { filename: 'episode.mkv', size: 100 } };
   f.emit({ type: 'queue', data: [job] });
   assert.equal(f.document.querySelector('.nav-count').textContent, '1');
   assert.equal(f.document.activeElement, input);
@@ -705,4 +705,28 @@ test('scan progress survives background renders and resets for the next scan',as
   assert.equal(f.document.querySelector('#scan-status').textContent,'Scanning channel metadata…');
   finishScan();
   await new Promise(resolve=>setTimeout(resolve,20));
+});
+
+test('invalid desktop events leave the last valid queue and lifetime totals intact',async t=>{
+  const job={id:'active',series:'Show',mode:'archive',status:'downloading',item:{filename:'episode.mkv',size:100},received:20};
+  const f=await fixture(t,{jobs:[job],usage:{payloadBytes:1048576,publishedBytes:0,completedFiles:0},settings:{theme:'dark'}});
+  f.click('[data-page="queue"]');
+  const row=f.document.querySelector('.queue-item');
+  f.emit({type:'queue',data:[{...job,item:{filename:'bad.mkv',size:'invalid'}}]});
+  assert.equal(f.document.querySelector('.queue-item'),row);
+  assert.match(row.textContent,/episode.mkv/);
+  assert.match(f.document.querySelector('#toast').textContent,/invalid data/);
+  f.emit({type:'usage',data:{payloadBytes:Infinity}});
+  f.click('[data-page="settings"]');
+  assert.match(f.document.querySelector('#usage-summary').textContent,/1.0 MB/);
+  f.emit({type:'updates',data:{state:'idle',lastCheckedAt:null}});
+  assert.match(f.document.querySelector('main').textContent,/Last checked: Never/);
+});
+
+test('bootstrap only applies desktop-owned fields',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[],page:'injected',selected:['invalid'],demo:true});
+  assert.ok(f.document.querySelector('.library-shell'));
+  assert.equal(f.document.querySelector('.demo-pill'),null);
+  f.click('[data-page="queue"]');
+  assert.ok(f.document.querySelector('[data-action="download-tab"][data-tab="ongoing"]'));
 });

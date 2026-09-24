@@ -1,4 +1,4 @@
-import { bytes } from "../../../shared/lib/format.mjs";
+import { bytes } from "../../../shared/lib/format";
 import type { Usage, SettingsState, SettingsActionHandler } from "../types";
 import { SettingsButton } from "./SettingsButton";
 

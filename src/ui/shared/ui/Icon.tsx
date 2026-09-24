@@ -1,4 +1,4 @@
-import { paths } from "./icons.mjs";
+import { paths } from "./icons";
 
 /** Only the application's static SVG definitions enter this boundary. */
 export function Icon({ name }: { name: string }) {

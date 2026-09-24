@@ -1,4 +1,5 @@
-export async function advanceDiscovery(method, payload, {call, cancelled, onStage}) {
+import type { DiscoveryCall, DiscoveryMethod, DiscoveryRequests, DiscoveryResult } from "./flow-types";
+export async function advanceDiscovery(method: DiscoveryMethod, payload: DiscoveryRequests[DiscoveryMethod], {call, cancelled, onStage}: {call: DiscoveryCall; cancelled: () => boolean; onStage: (stage: string) => void}): Promise<DiscoveryResult | null> {
   const automatic = ["discovery-search","discovery-follow","complete-subscriptions"].includes(method);
   for (let step=0; step<8; step++) {
     if (cancelled()) return null;

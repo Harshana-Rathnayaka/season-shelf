@@ -1,70 +1,56 @@
-import { createInitialState, reduceBackgroundEvent } from "./state.ts";
-import { pendingDownloadCount } from "../features/downloads/selectors.ts";
-import { friendlyError } from "../shared/lib/format.mjs";
-import { chosen, visible, selectedItems, effectiveQuality } from "../features/library/selectors.ts";
-import { updateLibrary } from "../features/library/actions.ts";
-import { createRenderer } from "./renderer.tsx";
-import { handleDownloadCommand } from "../features/downloads/actions.ts";
+import { createPresentation } from "./presentation";
+import { createDiscovery } from "./discovery";
+import type { LibraryItem } from "../features/library/types";
+import { call, subscribe } from "./ipc";
+import type { LibraryCommand } from "../features/library/types";
+import type { DownloadCommand } from "../features/downloads/types";
+import type { Settings } from "../features/settings/types";
+import type { DialogAction, DialogActionData, DialogSubmission } from "../shared/ui/dialog-actions";
+import type { Page } from "./AppShell";
+import { createInitialState, reduceBackgroundEvent } from "./state";
+import { pendingDownloadCount } from "../features/downloads/selectors";
+import { friendlyError } from "../shared/lib/format";
+import { chosen, visible, selectedItems, effectiveQuality } from "../features/library/selectors";
+import { updateLibrary } from "../features/library/actions";
+import { createRenderer } from "./renderer";
+import { handleDownloadCommand } from "../features/downloads/actions";
 import { missingEpisodes } from "../../core/collection.mjs";
-import { applyAppearance } from "../features/settings/appearance.mjs";
-import { advanceDiscovery } from "../features/discovery/flow.mjs";
-import { createDialogs } from "./dialogs.tsx";
+import { createDialogs } from "./dialogs";
 import { defaultHiddenKeywords } from "../../core/catalog.mjs";
-import { demoCatalogue } from "../features/library/demo.mjs";
+import { demoCatalogue } from "../features/library/demo";
 
-const $ = (selector) => document.querySelector(selector);
-const renderer = createRenderer(document.getElementById("app"), {
+const appElement = document.getElementById("app")!;
+const dialogElement = document.querySelector<HTMLDialogElement>("#dialog")!;
+const toastElement = document.getElementById("toast")!;
+const $ = (selector: string) => document.querySelector<HTMLElement>(selector);
+const renderer = createRenderer(appElement, {
   onDownloadAction: dispatchDownload,
   onLibraryAction: dispatchLibrary,
   onShellAction: command => dispatchAction(command.action, "page" in command ? {page:command.page} : {}),
   onSettingsAction: command => command.action === "scan-staging" || command.action === "cleanup-staging"
-    ? dispatchDownload(command) : dispatchAction(command.action, "mode" in command ? {mode:command.mode} : {}),
+    ? dispatchDownload({action:command.action}) : dispatchAction(command.action, "mode" in command ? {mode:command.mode} : {}),
   onHelpAction: command => dispatchAction(command.action, "page" in command ? {page:command.page} : {}),
   onSaveSettings: saveSettings,
   hasDesktop: !!window.shelf,
   onBrowse: () => { state.page = "library"; render(); },
 });
-const dialogs = createDialogs(document.querySelector("#dialog"), {onAction:dispatchDialog,onSubmit:dispatchForm});
+const dialogs = createDialogs(dialogElement, {onAction:dispatchDialog,onSubmit:dispatchForm});
 let state = createInitialState(!!window.shelf);
-let discoveryVersion = 0, discoveryBusy = false, titleBarColours = "";
-let toastTimer, liveSnapshot, renderedPage;
-function toast(message, error = false) {
-  const el = $("#toast");
-  el.textContent = friendlyError(message);
-  el.className = `visible ${error ? "error" : ""}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.className = ""), 5500);
-}
-async function call(method, payload) {
-  if (!window.shelf)
-    throw new Error("Open the desktop app to use your Telegram account");
-  const result = await window.shelf.call(method, payload);
-  if (!result.ok) throw new Error(friendlyError(result.error));
-  return result.data;
-}
-function applyTheme() {
-  applyAppearance(state.settings);
-  document.documentElement.dataset.theme =
-    state.settings.theme === "system"
-      ? matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-      : state.settings.theme;
-  if (state.customTitleBar && window.shelf) {
-    const light = document.documentElement.dataset.theme === "light";
-    const color = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || (light ? "#f5f6f4" : "#101113");
-    const symbolColor = light ? "#202c27" : "#edf0ef";
-    const signature = color + symbolColor;
-    if (signature !== titleBarColours) {
-      titleBarColours = signature;
-      call("window-theme",{color,symbolColor}).catch(()=>{titleBarColours="";});
-    }
-  }
-}
-matchMedia("(prefers-color-scheme: dark)").addEventListener(
-  "change",
-  applyTheme,
-);
+const presentation = createPresentation(() => state, call, toastElement);
+const {toast, applyTheme} = presentation;
+const discovery = createDiscovery({call,dialogs,onJoined:async joined => {
+  state.demo=false;state.channels=joined.channels;await scan(joined.channel.id);
+}});
+let unsubscribe: (() => void) | undefined;
+window.addEventListener("pagehide", () => {
+  unsubscribe?.();
+  discovery.invalidate();
+  presentation.dispose();
+  dialogs.dispose();
+  renderer.dispose();
+}, {once:true});
+let liveSnapshot: Pick<typeof state, "catalogue" | "jobs" | "channels"> | undefined;
+let renderedPage: string | undefined;
 function startDemo() {
   if (!state.demo)
     liveSnapshot = {
@@ -89,26 +75,24 @@ function render() {
   const keepPageScroll = renderedPage === pageKey;
   renderedPage = pageKey;
   applyTheme();
-  $("#app").classList.toggle("sidebar-collapsed", !!state.settings.sidebarCollapsed);
+  appElement.classList.toggle("sidebar-collapsed", !!state.settings.sidebarCollapsed);
   const count = pendingDownloadCount(state.jobs);
-  $("#app").classList.toggle("custom-titlebar", !!state.customTitleBar);
+  appElement.classList.toggle("custom-titlebar", !!state.customTitleBar);
   renderer.render(state, count);
-  if (keepPageScroll && $(".workspace-scroll")) $(".workspace-scroll").scrollTop = oldPageScroll;
+  if (keepPageScroll && $(".workspace-scroll")) $(".workspace-scroll")!.scrollTop = oldPageScroll;
 
 }
 function refreshQueueBadge() {
   renderer.updateShell(state, pendingDownloadCount(state.jobs));
 }
 function updatePrompt() {
-  if(state.updates?.state!=="ready" || state.updates.deferred || $("#dialog").open) return;
-  dialogs.show({kind:"update",version:state.updates.version});
+  if(state.updates?.state!=="ready" || state.updates.deferred || dialogElement.open) return;
+  dialogs.show({kind:"update",version:state.updates.version || ""});
 }
 async function closeActiveDialog() {
   const view=dialogs.current();
   if(!view)return;
-  const cancellingDiscovery=discoveryBusy;
-  discoveryVersion++;
-  discoveryBusy=false;
+  const cancellingDiscovery=discovery.invalidate();
   dialogs.close();
   if(view.kind==="confirmation")await call("confirmation-reply",{id:view.id,response:0});
   if(view.kind==="auth")await call("auth-reply",{id:view.id,cancel:true});
@@ -116,7 +100,7 @@ async function closeActiveDialog() {
   if(cancellingDiscovery)await call("discovery-cancel");
 }
 function showGuide() { dialogs.show({kind:"guide"}); }
-function connectionModal() {
+function connectionModal(): void | Promise<void> {
   if (state.demo && window.shelf) {
     state.demo = false;
     if (liveSnapshot) Object.assign(state, liveSnapshot);
@@ -131,32 +115,11 @@ function connectionModal() {
     if(dialogs.generation()===generation) dialogs.update(view=>view.kind==="connect"?{...view,suggestions}:view);
   }).catch(()=>{});
 }
-function discoveryModal(source = null) { dialogs.show({kind:"discovery-search",source}); }
-async function discoveryRequest(method,payload) {
-  const version=++discoveryVersion;
-  discoveryBusy=true;
-  const reading=["discovery-source","discovery-open-message"].includes(method);
-  dialogs.show({kind:"discovery-wait",reading});
-  try {
-    const result=method==="discovery-join"?{joined:await call(method,payload)}:await advanceDiscovery(method,payload,{call,cancelled:()=>version!==discoveryVersion,onStage:stage=>{
-      if(version!==discoveryVersion)return;
-      dialogs.update(view=>view.kind!=="discovery-wait"?view:{...view,heading:stage==="discovery-join"?"Joining series channel...":stage==="discovery-follow"?"Opening series result...":reading?"Checking Telegram...":"Waiting for bot replies..."});
-    }});
-    if(!result || version!==discoveryVersion)return;
-    if(result.joined){state.demo=false;state.channels=result.joined.channels;await scan(result.joined.channel.id);return;}
-    if(result.groups)return dialogs.show({kind:"discovery-groups",groups:result.groups});
-    if(result.source)return discoveryModal(result.source);
-    if(result.channel)return dialogs.show({kind:"discovery-channel",channel:result.channel});
-    dialogs.show({kind:"discovery-results",notice:result.notice,messages:result.messages});
-  } catch(error) {
-    if(version===discoveryVersion)dialogs.show({kind:"discovery-error",error:error.message});
-  } finally {if(version===discoveryVersion)discoveryBusy=false;}
-}
-async function chooseSeries() {
+async function chooseSeries(): Promise<void> {
   if(!state.connected && !state.demo)return connectionModal();
   dialogs.show({kind:"channels",channels:state.channels,demo:state.demo,filter:state.channelFilter,keywords:state.settings.hiddenKeywords??defaultHiddenKeywords,selectedMediaChannel:state.catalogue?.items.some(item=>!item.reason)?state.catalogue.channel.id:undefined});
 }
-async function connect(payload) {
+async function connect(payload: {apiId?:string;apiHash?:string;phone?:string}) {
   dialogs.show({kind:"message",title:"Connecting...",message:"Keep this window open. Telegram may ask for a login code or your two-step verification password."});
   const result = await call("connect", payload);
   state.connected = result.connected;
@@ -168,7 +131,7 @@ async function connect(payload) {
   toast("Telegram connected. Choose a series channel.");
   chooseSeries();
 }
-async function scan(id) {
+async function scan(id: string) {
   dialogs.close();
   state.busy = true;
   state.scanProgress = undefined;
@@ -189,32 +152,32 @@ async function scan(id) {
     render();
   }
 }
-async function setSettings(patch) {
+async function setSettings(patch: Partial<Settings>) {
   state.settings = state.demo
     ? { ...state.settings, ...patch }
     : await call("settings", patch);
   render();
 }
 
-async function saveSettings(patch, message) {
+async function saveSettings(patch: Partial<Settings>, message?: string) {
   try { await setSettings(patch); if (message) toast(message); }
-  catch (error) { toast(error.message, true); }
+  catch (error) { toast(error instanceof Error ? error.message : String(error), true); }
 }
 
-async function dispatchLibrary(command) {
+async function dispatchLibrary(command: LibraryCommand) {
   if (updateLibrary(state, command)) { render(); return; }
   await dispatchAction(command.action, "mode" in command ? { mode: command.mode } : {});
 }
 
-async function dispatchDownload(command) {
+async function dispatchDownload(command: DownloadCommand) {
   try {
     await handleDownloadCommand(command, { state, call, render, toast, showFileDetails: job => dialogs.show({kind:"file-details",job}), closeDialog: () => dialogs.close() });
   } catch (error) {
-    toast(error.message, true);
+    toast(error instanceof Error ? error.message : String(error), true);
   }
 }
 
-async function dispatchDialog(action, data = {}) {
+async function dispatchDialog(action: DialogAction, data: DialogActionData = {}) {
   if (action === "retry-naming" || action === "reveal-job" || action === "delete-job") {
     if (data.job) await dispatchDownload({action,job:data.job});
     return;
@@ -222,18 +185,21 @@ async function dispatchDialog(action, data = {}) {
   await dispatchAction(action,data);
 }
 
-async function dispatchAction(action, data = {}) {
+function required(value: string | undefined): string { if(!value)throw new Error("This action is no longer available. Please reopen it.");return value; }
+
+async function dispatchAction(action: string, data: DialogActionData & {page?: Page;mode?: "archive" | "watch"} = {}) {
   try {
     if (action === "confirmation-reply") {
       const view=dialogs.current();if(view?.kind!=="confirmation")return;dialogs.close();await call("confirmation-reply",{id:view.id,response:Number(data.response)});
     } else if (action === "use-login") {
-      const generation=dialogs.generation();const saved=await call("login-suggestion",{id:data.id});if(dialogs.generation()===generation)dialogs.update(view=>view.kind==="connect"?{...view,saved}:view);
+      const generation=dialogs.generation();const saved=await call("login-suggestion",{id:required(data.id)});if(dialogs.generation()===generation)dialogs.update(view=>view.kind==="connect"?{...view,saved}:view);
     } else if (action === "forget-logins") { await call("forget-login-suggestions");dialogs.update(view=>view.kind==="connect"?{...view,suggestions:[]}:view);
     } else if (action === "update-later") {state.updates=await call("update-later");dialogs.close();render();
     } else if (action === "toggle-sidebar") {
       await setSettings({sidebarCollapsed: !state.settings.sidebarCollapsed});
-      $(".sidebar-toggle").focus();
+      $(".sidebar-toggle")?.focus();
     } else if (action === "nav") {
+      if (!data.page) return;
       state.page = data.page;
       if (state.page === "queue") state.downloadTab = "ongoing";
       render();
@@ -248,20 +214,22 @@ async function dispatchAction(action, data = {}) {
     } else if (action === "reset-keywords") {
       await setSettings({hiddenKeywords:[...defaultHiddenKeywords]});
       toast("Default keywords restored.");
-    } else if (action === "set-theme")
-      await setSettings({ theme: data.theme });
-    else if (action === "channel-filter") {
+    } else if (action === "channel-filter") {
+      if(data.filter!=="all" && data.filter!=="suggested")return;
       state.channelFilter = data.filter;
       dialogs.update(view=>view.kind==="channels"?{...view,filter:state.channelFilter}:view);
     } else if (action === "connect") connectionModal();
     else if (action === "reconnect") await connect({});
-    else if (["update-check","update-download","update-install"].includes(action)) {if(action === "update-check"){if(state.updateChecking)return;state.updateChecking=true;render();}try{state.updates=await call(action);render();}catch(error){if(dialogs.current()?.kind==="update")dialogs.update(view=>view.kind==="update"?{...view,error:friendlyError(error.message)}:view);else throw error;}finally{state.updateChecking=false;render();}}
+    else if ((action==="update-check" || action==="update-download" || action==="update-install")) {if(action === "update-check"){if(state.updateChecking)return;state.updateChecking=true;render();}try{state.updates=await call(action);render();}catch(error){if(dialogs.current()?.kind==="update")dialogs.update(view=>view.kind==="update"?{...view,error:friendlyError(error instanceof Error ? error.message : String(error))}:view);else throw error;}finally{state.updateChecking=false;render();}}
     else if (action === "watch-series") {
-      const watches=await call("watch-list");const watch=watches.find(w=>w.channel.id===state.catalogue.channel.id && w.mode===state.mode);
+      if(!state.catalogue)return;
+      const channelId=state.catalogue.channel.id;
+      const watches=await call("watch-list");const watch=watches.find(w=>w.channel.id===channelId && w.mode===state.mode);
       dialogs.show({kind:"watch",mode:state.mode,watch});
     } else if (action === "find-missing") {
+      if(!state.catalogue)return;
       if(!state.demo) state.jobs=await call("find-missing",{mode:state.mode});
-      const missing=missingEpisodes(chosen(state),state.jobs,state.catalogue.channel.id,state.mode).filter(item=>item.season===state.season);
+      const missing: LibraryItem[]=missingEpisodes(chosen(state),state.jobs,state.catalogue.channel.id,state.mode).filter((item: LibraryItem)=>item.season===state.season);
       state.selected=new Set(missing.map(item=>item.id));render();toast(`${missing.length} files selected to fill gaps in this season. Compares app-managed saved files.`);
     } else if (action === "subscription-help") {
       const choices=await call("subscription-choices");
@@ -271,17 +239,17 @@ async function dispatchAction(action, data = {}) {
       if (!state.demo) state.channels = await call("channels");
       dialogs.update(view=>view.kind==="channels"?{...view,channels:state.channels}:view);
     } else if (action === "discover") {
-      discoveryModal();
+      discovery.showSearch();
     } else if (action === "discovery-source") {
-      await discoveryRequest("discovery-source");
+      await discovery.run("discovery-source");
     } else if (action === "discovery-group") {
-      await discoveryRequest("discovery-source",{groupId:data.choice});
+      await discovery.run("discovery-source",{groupId:data.choice});
     } else if (action === "discovery-follow") {
-      await discoveryRequest("discovery-follow",{id:data.choice});
+      await discovery.run("discovery-follow",{id:required(data.choice)});
     } else if (action === "discovery-join") {
-      await discoveryRequest("discovery-join",{id:data.choice});
-    } else if (action === "scan-channel") await scan(data.channel);
-    else if (action === "rescan") await scan(state.catalogue.channel.id);
+      await discovery.run("discovery-join",{id:required(data.choice)});
+    } else if (action === "scan-channel") await scan(required(data.channel));
+    else if (action === "rescan") {if(state.catalogue)await scan(state.catalogue.channel.id);}
     else if (action === "demo") startDemo();
     else if (action === "exit-demo") {
       state.demo = false;
@@ -298,9 +266,11 @@ async function dispatchAction(action, data = {}) {
         return toast(
           "Folder selection is available in the connected desktop app.",
         );
+      if(!data.mode)return;
       state.settings = await call("choose-folder", { mode: data.mode });
       render();
     } else if (action === "download") {
+      if(!state.catalogue)return;
       if (state.demo) {
         const batchId = state.jobs.find(j => !["complete","cancelled","deleted"].includes(j.status))?.batchId || crypto.randomUUID();
         state.currentBatchId = batchId;
@@ -352,28 +322,28 @@ async function dispatchAction(action, data = {}) {
       await call("finish-onboarding"); dialogs.close();
     }
   } catch (error) {
-    toast(error.message, true);
+    toast(error instanceof Error ? error.message : String(error), true);
   }
 }
-async function dispatchForm(submission) {
+async function dispatchForm(submission: DialogSubmission) {
   const {form,values}=submission;
   try {
-    if(form==="discovery-link-form")await discoveryRequest("discovery-open-message",{link:values.link});
-    else if(form==="discovery-form")await discoveryRequest("discovery-search",{query:values.query,sourceId:values.sourceId});
+    if(form==="discovery-link-form")await discovery.run("discovery-open-message",{link:values.link});
+    else if(form==="discovery-form")await discovery.run("discovery-search",{query:values.query,sourceId:values.sourceId});
     else if(form==="watch-form"){
       await call("watch-set",{mode:state.mode,quality:effectiveQuality(state),automatic:values.watchMode==="off"?null:values.watchMode==="auto"});dialogs.close();toast("Series watch saved.");
-    } else if(form==="subscriptions-form")await discoveryRequest("complete-subscriptions",{ids:values.ids});
+    } else if(form==="subscriptions-form")await discovery.run("complete-subscriptions",{ids:values.ids});
     else if(form==="connect-form")await connect(values);
     else if(form==="auth-form"){
       if(dialogs.current()?.kind!=="auth")return;
       dialogs.show({kind:"message",title:"Verifying...",message:"Waiting for Telegram."});
       await call("auth-reply",{id:values.id,value:values.value});
     }
-  } catch(error){dialogs.close();toast(error.message,true);}
+  } catch(error){dialogs.close();toast(error instanceof Error ? error.message : String(error),true);}
 }
 async function initialize() {
 if (window.shelf) {
-  window.shelf.on(({ type, data }) => {
+  unsubscribe = subscribe(({ type, data }) => {
     if(type === "confirmation") {
       dialogs.show({kind:"confirmation",...data});
     } else if(type === "new-episodes") toast(`${data.count} new files in ${data.title}${data.automatic ? " queued." : ". Rescan the channel to view them."}`);
@@ -399,9 +369,9 @@ if (window.shelf) {
     else if (type === "auth-error") toast(data, true);
     else if (type === "auth-prompt") {
       dialogs.show({kind:"auth",id:data.id,label:data.label,authKind:data.kind});
-      $("#auth-form input").focus();
+      $("#auth-form input")?.focus();
     }
-  });
+  }, error => toast(error.message,true));
   try {
     Object.assign(state, await call("bootstrap"));
     state.season = chosen(state)[0]?.season || 1;
@@ -410,7 +380,7 @@ if (window.shelf) {
     if (state.connectionError) toast("Saved session could not reconnect. Use Connect Telegram to retry.", true);
   } catch (error) {
     render();
-    toast(error.message, true);
+    toast(error instanceof Error ? error.message : String(error), true);
   }
 } else startDemo();
 }

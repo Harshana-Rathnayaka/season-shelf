@@ -1,23 +1,23 @@
 # Code organization
 
-Season Shelf is migrating to React and TypeScript. The shell and navigation are
-React components checked with strict TypeScript. Downloads and Library also use
-typed React components and command handlers; domain types and download IPC
-contracts live alongside their feature. Settings, Help and every dialog also use
-typed React components; the JavaScript controller remains transitional. See the
-[migration plan](react-migration.md) for the remaining steps.
+The renderer uses React and strict TypeScript throughout. Pages, dialogs and
+reusable controls own their UI behaviour; application composition owns cross-feature
+actions, state, discovery orchestration and document-level effects. The preload
+boundary decodes external responses and events before they reach renderer state.
+Electron and core services remain JavaScript and retain their existing boundaries.
+See the [migration plan](react-migration.md) for validation and release status.
 
 | Location | Responsibility |
 | --- | --- |
 | `src/core/` | Download scheduling, file integrity, persistence and episode rules; no DOM or Electron UI. |
 | `src/desktop/main.cjs` | Application startup, service wiring, window lifecycle and IPC boundary. |
 | `src/desktop/handlers/` | Feature IPC registration with injected services and confirmation dialogs. |
-| `src/ui/app/` | Application composition: shell, React root, transitional controller and typed dialog host. |
+| `src/ui/app/` | Application composition: shell, React root, typed controller/state, IPC boundary, discovery orchestration and dialog host. |
 | `src/ui/features/library/` | Library page, selection commands, selectors, types, sample catalogue and feature components. |
 | `src/ui/features/downloads/` | Downloads page, queue commands, selectors, types, IPC contracts and feature components. |
 | `src/ui/features/settings/`, `help/`, `discovery/` | React settings sections, help content and discovery dialogs. |
 | `src/ui/shared/ui/` | Reusable buttons, async forms, pending-action hooks and icons; no feature state. |
-| `src/ui/shared/lib/` | Small shared presentation utilities such as byte and error formatting. |
+| `src/ui/shared/lib/` | Byte/error formatting and JSON-boundary decoding primitives. |
 | `dist/ui/` | Generated Vite output loaded by Electron and included in packages; not committed. |
 | `src/ui/styles/` | Base, shell, feature, responsive and workspace styles. |
 

@@ -6,8 +6,8 @@ export interface Settings {
   concurrency?: number;
   closeToTray?: boolean;
   sidebarCollapsed?: boolean;
-  archiveRoot?: { path: string };
-  watchRoot?: { path: string };
+  archiveRoot?: { path: string } | null;
+  watchRoot?: { path: string } | null;
   appearance?: Partial<Appearance>;
   transfer?: Partial<TransferPreferences>;
   hiddenKeywords?: string[];
@@ -17,7 +17,7 @@ export interface UpdateStatus {
   state?: "manual" | "idle" | "development" | "checking" | "current" | "unpublished" | "available" | "downloading" | "ready" | "error";
   version?: string;
   percent?: number;
-  lastCheckedAt?: string;
+  lastCheckedAt?: string | null;
   deferred?: boolean;
 }
 export interface SettingsState {

@@ -1,5 +1,5 @@
 import { cleanAppearance } from "../../../../core/appearance.mjs";
-import { appearanceValues, previewAppearance } from "../appearance.mjs";
+import { appearanceValues, previewAppearance } from "../appearance";
 import type { Settings, SaveSettings, SettingsActionHandler, Theme } from "../types";
 import { AsyncForm } from "../../../shared/ui/AsyncForm";
 import { SettingsButton } from "./SettingsButton";

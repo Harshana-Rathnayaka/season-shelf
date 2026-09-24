@@ -4,14 +4,15 @@ export type DownloadStatus =
   | "complete" | "deleted" | "missing" | "preview";
 
 export interface DownloadItem {
+  id?: string;
   filename: string;
   size: number;
   unverified?: boolean;
-  season?: number;
-  episode?: number;
-  episodeEnd?: number;
-  resolution?: number | string;
-  codec?: string;
+  season?: number | null;
+  episode?: number | null;
+  episodeEnd?: number | null;
+  resolution?: number | string | null;
+  codec?: string | null;
 }
 
 export interface DownloadRecord {

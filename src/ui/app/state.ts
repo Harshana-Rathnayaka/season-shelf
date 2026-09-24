@@ -9,7 +9,7 @@ export type AppState = ShellState & DownloadsState & LibraryState & SettingsStat
   channelFilter: "suggested" | "all";
   hasCredentials: boolean;
   firstRun?: boolean;
-  connectionError?: string;
+  connectionError?: string | null;
 };
 
 export type BackgroundEvent =

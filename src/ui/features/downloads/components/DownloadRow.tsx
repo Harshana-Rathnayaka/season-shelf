@@ -1,10 +1,10 @@
-import { bytes, friendlyError } from "../../../shared/lib/format.mjs";
+import { bytes, friendlyError } from "../../../shared/lib/format";
 import { canPauseDownload, canResumeDownload, canRemoveDownload } from "../selectors";
 import type { DownloadRecord, DownloadActionHandler } from "../types";
 import { Icon } from "../../../shared/ui/Icon";
 import { DownloadButton } from "./DownloadButton";
 
-const pad = (value: number | undefined) => String(value ?? 0).padStart(2, "0");
+const pad = (value: number | null | undefined) => String(value ?? 0).padStart(2, "0");
 
 export function DownloadRow({ job, onAction }: { job: DownloadRecord; onAction: DownloadActionHandler }) {
   const filename = job.finalPath?.split(/[\\/]/).pop() || job.item.filename;

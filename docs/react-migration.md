@@ -14,7 +14,7 @@ Branch: `refactor/react-typescript`, based on current `master` (v1.1.0).
 ## Rules
 
 - New React modules use strict TypeScript. Existing JavaScript remains explicitly outside type checking until converted; no blanket `any` or `@ts-nocheck` in new components.
-- React owns the shell, pages and dialogs. The remaining JavaScript controller is converted in the state/IPC stage.
+- React owns the shell, pages and dialogs. Renderer controllers and helpers use TypeScript; core and Electron services remain JavaScript.
 - Keep existing CSS and selectors during conversion. Preserve context isolation, sandboxing, preload allowlists and the production content security policy.
 - Preserve completed media, partial-file cleanup, queue concurrency and cumulative usage totals.
 - Each step must pass existing behavioural tests, type checking and a production renderer build. Add regression coverage where ownership or behaviour changes.
@@ -49,17 +49,25 @@ owns account-menu state and focus, and document-wide action delegation is remove
 All 146 tests pass, strict TypeScript and production builds pass, and the offline
 preview is regenerated. Unsaved settings survive usage/update events and failed
 saves. No visual redesign was included in this stage.
-Steps 5-6 remain; no migration release has been published.
+The following stages complete the renderer migration; no migration release has been published.
 
-Step 5 has started: application state and background-event reduction now have
-explicit TypeScript types. Scan progress belongs to React state and survives
-background queue renders; each new scan resets it. Settings and dialog callbacks
-route directly to download commands, removing the legacy action adapter.
-All 147 tests pass. Settings and the connection dialog were inspected in Chrome,
-including Escape dismissal and focus restoration. The controller and full IPC
-contract/runtime validation remain to be migrated before visual redesign.
+Step 5 is implemented: renderer state, controller, discovery flow, appearance,
+formatting and icon definitions all use strict TypeScript. Typed IPC requests and
+runtime response/event decoders preserve the last valid state on malformed input
+and accept only desktop-owned bootstrap fields. Nullable values match actual
+backend responses. Discovery and document effects have dedicated modules, and
+preload/media-query subscriptions are cleaned up when the renderer closes.
+All 154 tests pass, including malformed-event preservation and scan-progress
+regressions. Production build and offline preview pass. Settings and connection
+dialogs were inspected in Chrome; no live Telegram throughput claim is made.
+Step 6 is complete for the renderer migration: obsolete adapters and templates
+are removed; all renderer modules are TypeScript. The unpacked Windows x64 build
+passed, and its archive contains the Electron entry/preload and built renderer
+assets. Sample queue creation and pause controls were verified in Chrome.
+The installed application's profile and live Telegram downloads were not used
+for package execution. Visual redesign follows this validated refactor.
 
 The renderer now uses feature folders: Library and Downloads each own their page,
 components, actions, selectors and types. Common controls live in `shared/ui`,
 formatting in `shared/lib`, and composition in `app`. Settings, Help and discovery
-also have feature homes for the remaining migration. See [architecture](architecture.md).
+also own their typed views and behaviour. See [architecture](architecture.md).

@@ -1,4 +1,4 @@
-import { bytes } from "../../../shared/lib/format.mjs";
+import { bytes } from "../../../shared/lib/format";
 import { selectedItems } from "../selectors";
 import type { LibraryState, LibraryActionHandler } from "../types";
 import { LibraryButton } from "./LibraryButton";

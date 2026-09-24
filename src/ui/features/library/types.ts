@@ -17,7 +17,7 @@ export interface LibraryItem {
   unverified?: boolean;
 }
 export interface LibraryState {
-  catalogue: { channel: { id: string; title: string }; items: LibraryItem[]; truncated?: boolean } | null;
+  catalogue: { channel: { id: string; title: string }; items: LibraryItem[]; truncated?: boolean; scanned?: number } | null;
   mode: DestinationMode;
   quality: Partial<QualitySelection>;
   libraryTab: LibraryTab;
@@ -27,7 +27,7 @@ export interface LibraryState {
   busy: boolean;
   scanProgress?: { scanned: number; found: number };
   demo: boolean;
-  settings: { archiveRoot?: { path: string }; watchRoot?: { path: string } };
+  settings: { archiveRoot?: { path: string } | null; watchRoot?: { path: string } | null };
 }
 export type LibraryCommand =
   | { action: "mode"; mode: DestinationMode }

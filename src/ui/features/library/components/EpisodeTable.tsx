@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type MouseEvent } from "react";
-import { bytes } from "../../../shared/lib/format.mjs";
+import { bytes } from "../../../shared/lib/format";
 import { visible } from "../selectors";
 import type { LibraryState, LibraryItem, LibraryActionHandler } from "../types";
 

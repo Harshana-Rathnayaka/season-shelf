@@ -683,3 +683,26 @@ test('Closing an authentication prompt cancels it and removes credential control
   assert.equal(f.document.querySelector('#dialog').open,false);
   assert.deepEqual(f.calls.filter(c=>c.method==='auth-reply').map(c=>({id:c.payload.id,cancel:c.payload.cancel})),[{id:'auth',cancel:true}]);
 });
+
+test('scan progress survives background renders and resets for the next scan',async t=>{
+  const item=parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:100});
+  const catalogue={channel:{id:'show',title:'Show'},items:[item]};
+  let finishScan;
+  const f=await fixture(t,{catalogue,channels:[catalogue.channel],jobs:[],settings:{theme:'dark'}},async method=>{
+    if(method==='scan')return new Promise(resolve=>{finishScan=()=>resolve(catalogue);});
+    return [];
+  });
+  f.click('[data-action="rescan"]');
+  f.emit({type:'scan-progress',data:{scanned:250,found:12}});
+  assert.match(f.document.querySelector('#scan-status').textContent,/250 messages checked.*12 episode files found/);
+  f.emit({type:'queue',data:[]});
+  assert.match(f.document.querySelector('#scan-status').textContent,/250 messages checked/);
+  finishScan();
+  await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(f.document.querySelector('#scan-status'),null);
+  f.emit({type:'scan-progress',data:{scanned:999,found:90}});
+  f.click('[data-action="rescan"]');
+  assert.equal(f.document.querySelector('#scan-status').textContent,'Scanning channel metadata…');
+  finishScan();
+  await new Promise(resolve=>setTimeout(resolve,20));
+});

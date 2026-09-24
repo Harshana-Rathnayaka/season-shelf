@@ -1,9 +1,10 @@
+import { createInitialState, reduceBackgroundEvent } from "./state.ts";
 import { pendingDownloadCount } from "../features/downloads/selectors.ts";
 import { friendlyError } from "../shared/lib/format.mjs";
 import { chosen, visible, selectedItems, effectiveQuality } from "../features/library/selectors.ts";
 import { updateLibrary } from "../features/library/actions.ts";
 import { createRenderer } from "./renderer.tsx";
-import { handleDownloadCommand, legacyDownloadCommand } from "../features/downloads/actions.ts";
+import { handleDownloadCommand } from "../features/downloads/actions.ts";
 import { missingEpisodes } from "../../core/collection.mjs";
 import { applyAppearance } from "../features/settings/appearance.mjs";
 import { advanceDiscovery } from "../features/discovery/flow.mjs";
@@ -16,35 +17,15 @@ const renderer = createRenderer(document.getElementById("app"), {
   onDownloadAction: dispatchDownload,
   onLibraryAction: dispatchLibrary,
   onShellAction: command => dispatchAction(command.action, "page" in command ? {page:command.page} : {}),
-  onSettingsAction: command => dispatchAction(command.action, "mode" in command ? {mode:command.mode} : {}),
+  onSettingsAction: command => command.action === "scan-staging" || command.action === "cleanup-staging"
+    ? dispatchDownload(command) : dispatchAction(command.action, "mode" in command ? {mode:command.mode} : {}),
   onHelpAction: command => dispatchAction(command.action, "page" in command ? {page:command.page} : {}),
   onSaveSettings: saveSettings,
   hasDesktop: !!window.shelf,
   onBrowse: () => { state.page = "library"; render(); },
 });
-const dialogs = createDialogs(document.querySelector("#dialog"), {onAction:dispatchAction,onSubmit:dispatchForm});
-const state = {
-  updates: {state:"idle"},
-  page: "library",
-  downloadTab: "ongoing",
-  mode: "archive",
-  quality: {},
-  libraryTab: "verified",
-  channelFilter: "suggested",
-  season: 1,
-  selected: new Set(),
-  query: "",
-  catalogue: null,
-  channels: [],
-  jobs: [],
-  usage: {payloadBytes:0,publishedBytes:0,completedFiles:0},
-  stagingInfo: null,
-  connected: false,
-  hasCredentials: false,
-  settings: { theme: "dark", concurrency: 2 },
-  demo: !window.shelf,
-  busy: false,
-};
+const dialogs = createDialogs(document.querySelector("#dialog"), {onAction:dispatchDialog,onSubmit:dispatchForm});
+let state = createInitialState(!!window.shelf);
 let discoveryVersion = 0, discoveryBusy = false, titleBarColours = "";
 let toastTimer, liveSnapshot, renderedPage;
 function toast(message, error = false) {
@@ -190,6 +171,7 @@ async function connect(payload) {
 async function scan(id) {
   dialogs.close();
   state.busy = true;
+  state.scanProgress = undefined;
   state.page = "library";
   const channel = state.channels.find(channel=>channel.id === id);
   if (channel) state.catalogue = {channel,items:[],scanned:0};
@@ -203,6 +185,7 @@ async function scan(id) {
     state.season = chosen(state)[0]?.season || 1;
   } finally {
     state.busy = false;
+    state.scanProgress = undefined;
     render();
   }
 }
@@ -231,13 +214,16 @@ async function dispatchDownload(command) {
   }
 }
 
+async function dispatchDialog(action, data = {}) {
+  if (action === "retry-naming" || action === "reveal-job" || action === "delete-job") {
+    if (data.job) await dispatchDownload({action,job:data.job});
+    return;
+  }
+  await dispatchAction(action,data);
+}
+
 async function dispatchAction(action, data = {}) {
   try {
-    const downloadCommand = legacyDownloadCommand(action, data);
-    if (downloadCommand) {
-      await dispatchDownload(downloadCommand);
-      return;
-    }
     if (action === "confirmation-reply") {
       const view=dialogs.current();if(view?.kind!=="confirmation")return;dialogs.close();await call("confirmation-reply",{id:view.id,response:Number(data.response)});
     } else if (action === "use-login") {
@@ -391,25 +377,25 @@ if (window.shelf) {
     if(type === "confirmation") {
       dialogs.show({kind:"confirmation",...data});
     } else if(type === "new-episodes") toast(`${data.count} new files in ${data.title}${data.automatic ? " queued." : ". Rescan the channel to view them."}`);
-    else if(type === "updates") {state.updates=data;if(state.page==="settings") render();if(data.state==="ready"){updatePrompt();if(!$("#update-error"))toast("Update ready. Open Settings to restart and install.");}}
+    else if(type === "updates") {state=reduceBackgroundEvent(state,{type,data});if(state.page==="settings") render();if(data.state==="ready"){updatePrompt();if(!$("#update-error"))toast("Update ready. Open Settings to restart and install.");}}
     else if (type === "connection") {
-      Object.assign(state,data);
+      state=reduceBackgroundEvent(state,{type,data});
       render();
       if (data.connectionError) toast("Saved session could not reconnect. Use Connect Telegram to retry.",true);
     } else if (type === "usage") {
-      state.usage = data;
-      state.currentBatchId = data.currentBatchId;
+      state=reduceBackgroundEvent(state,{type,data});
       if (state.page === "queue" || state.page === "settings") render();
     } else if (type === "queue") {
       if (state.demo) {
         if (liveSnapshot) liveSnapshot.jobs = data;
       } else {
-        state.jobs = data;
+        state=reduceBackgroundEvent(state,{type,data});
         if (state.page === "queue") render();else refreshQueueBadge();
       }
-    } else if (type === "scan-progress" && $("#scan-status"))
-      $("#scan-status").textContent =
-        `Scanning… ${data.scanned} messages checked · ${data.found} episode files found`;
+    } else if (type === "scan-progress") {
+      state=reduceBackgroundEvent(state,{type,data});
+      if(state.busy && state.page==="library")render();
+    }
     else if (type === "auth-error") toast(data, true);
     else if (type === "auth-prompt") {
       dialogs.show({kind:"auth",id:data.id,label:data.label,authKind:data.kind});

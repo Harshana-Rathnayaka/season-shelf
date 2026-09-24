@@ -33,7 +33,7 @@ export function LibraryPage({ state, hasDesktop, onAction }: Props) {
         <LibraryButton label="Change series" glyph="folder" command={{ action: "choose-series" }} onAction={onAction} />
         <LibraryButton label="Rescan channel" glyph="refresh" iconOnly command={{ action: "rescan" }} onAction={onAction} disabled={state.busy || !state.catalogue} />
       </div></div>
-      {state.busy && <div className="notice" role="status" id="scan-status">Scanning channel metadata…</div>}
+      {state.busy && <div className="notice" role="status" id="scan-status">{state.scanProgress ? `Scanning… ${state.scanProgress.scanned} messages checked · ${state.scanProgress.found} episode files found` : "Scanning channel metadata…"}</div>}
       {state.demo && <div className="sample-note"><Icon name="info" /> Sample data lets you explore the interface. No files are downloaded.{hasDesktop && <LibraryButton label="Exit preview" command={{ action: "exit-demo" }} onAction={onAction} />}</div>}
       {state.catalogue?.truncated && <div className="notice">Scan limited to 10,000 messages. Earlier episodes may not be included.</div>}
       {state.catalogue ? <>

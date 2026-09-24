@@ -12,12 +12,13 @@ export interface Settings {
   transfer?: Partial<TransferPreferences>;
   hiddenKeywords?: string[];
 }
-export interface Usage { payloadBytes?: number; publishedBytes?: number; completedFiles?: number; since?: string }
+export interface Usage { payloadBytes?: number; publishedBytes?: number; completedFiles?: number; since?: string; currentBatchId?: string }
 export interface UpdateStatus {
   state?: "manual" | "idle" | "development" | "checking" | "current" | "unpublished" | "available" | "downloading" | "ready" | "error";
   version?: string;
   percent?: number;
   lastCheckedAt?: string;
+  deferred?: boolean;
 }
 export interface SettingsState {
   settings: Settings;

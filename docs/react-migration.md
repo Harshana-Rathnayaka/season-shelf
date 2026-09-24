@@ -51,6 +51,14 @@ preview is regenerated. Unsaved settings survive usage/update events and failed
 saves. No visual redesign was included in this stage.
 Steps 5-6 remain; no migration release has been published.
 
+Step 5 has started: application state and background-event reduction now have
+explicit TypeScript types. Scan progress belongs to React state and survives
+background queue renders; each new scan resets it. Settings and dialog callbacks
+route directly to download commands, removing the legacy action adapter.
+All 147 tests pass. Settings and the connection dialog were inspected in Chrome,
+including Escape dismissal and focus restoration. The controller and full IPC
+contract/runtime validation remain to be migrated before visual redesign.
+
 The renderer now uses feature folders: Library and Downloads each own their page,
 components, actions, selectors and types. Common controls live in `shared/ui`,
 formatting in `shared/lib`, and composition in `app`. Settings, Help and discovery

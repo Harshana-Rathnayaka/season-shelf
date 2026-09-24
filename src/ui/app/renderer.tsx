@@ -1,15 +1,15 @@
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
-import { AppShell, type ShellState, type ShellActionHandler } from "./AppShell";
+import { AppShell, type ShellActionHandler } from "./AppShell";
 import { DownloadsPage } from "../features/downloads/DownloadsPage";
-import type { DownloadsState, DownloadActionHandler } from "../features/downloads/types";
+import type { DownloadActionHandler } from "../features/downloads/types";
 import { LibraryPage } from "../features/library/LibraryPage";
-import type { LibraryState, LibraryActionHandler } from "../features/library/types";
+import type { LibraryActionHandler } from "../features/library/types";
 import { SettingsPage } from "../features/settings/SettingsPage";
-import type { SettingsState, SettingsActionHandler, SaveSettings } from "../features/settings/types";
+import type { SettingsActionHandler, SaveSettings } from "../features/settings/types";
 import { HelpPage, type HelpCommand } from "../features/help/HelpPage";
 
-type RendererState = ShellState & DownloadsState & LibraryState & SettingsState;
+import type { AppState } from "./state";
 interface Callbacks {
   onDownloadAction: DownloadActionHandler;
   onLibraryAction: LibraryActionHandler;
@@ -23,7 +23,7 @@ interface Callbacks {
 
 export function createRenderer(container: HTMLElement, callbacks: Callbacks) {
   const root = createRoot(container);
-  function update(state: RendererState, count: number) {
+  function update(state: AppState, count: number) {
     // The existing controller restores focus/scroll immediately after rendering.
     flushSync(() => root.render(<AppShell state={state} count={count} onAction={callbacks.onShellAction}>
       {state.page === "queue"
@@ -36,7 +36,7 @@ export function createRenderer(container: HTMLElement, callbacks: Callbacks) {
     </AppShell>));
   }
   return {
-    render(state: RendererState, count: number) {
+    render(state: AppState, count: number) {
       update(state, count);
     },
     updateShell: update,

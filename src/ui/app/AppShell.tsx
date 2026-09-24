@@ -13,7 +13,7 @@ export interface ShellState {
   connected: boolean;
   restoringSession?: boolean;
   demo: boolean;
-  profile?: { name?: string; username?: string };
+  profile?: { name?: string; username?: string } | null;
 }
 const labels: Record<Page, string> = { library: "Series library", queue: "Downloads", settings: "Settings", help: "How it works" };
 

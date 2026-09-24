@@ -81,15 +81,3 @@ export async function handleDownloadCommand(command: DownloadCommand, { state, c
   }
   render();
 }
-
-/** Temporary adapter for Settings and file-detail dialogs awaiting migration. */
-export function legacyDownloadCommand(action: string, data: DOMStringMap): DownloadCommand | null {
-  if (action === "scan-staging" || action === "cleanup-staging" || action === "delete-all-queue") return { action };
-  if (action === "remove-history") return { action, job: data.job };
-  if (action === "download-tab" && (data.tab === "ongoing" || data.tab === "finished")) return { action, tab: data.tab };
-  if (action === "bulk-job" && (data.control === "pause" || data.control === "resume")) return { action, control: data.control };
-  if (!data.job) return null;
-  if (action === "job" && (data.control === "pause" || data.control === "resume" || data.control === "remove")) return { action, job: data.job, control: data.control };
-  if (action === "open-job" || action === "file-details" || action === "retry-naming" || action === "reveal-job" || action === "delete-job") return { action, job: data.job };
-  return null;
-}

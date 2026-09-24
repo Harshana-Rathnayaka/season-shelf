@@ -25,6 +25,7 @@ export interface LibraryState {
   season: number;
   query: string;
   busy: boolean;
+  scanProgress?: { scanned: number; found: number };
   demo: boolean;
   settings: { archiveRoot?: { path: string }; watchRoot?: { path: string } };
 }

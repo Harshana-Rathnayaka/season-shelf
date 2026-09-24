@@ -57,6 +57,28 @@ test("adapter rejects a changed source before requesting file bytes", async () =
   }, /changed/);
 });
 
+test("range requests refill while the consumer is still writing the previous chunk", async () => {
+  const block = 524288, calls = [];
+  const adapter = new TelegramAdapter({});
+  adapter.connected = true;
+  adapter.client = {
+    getEntity: async () => ({}),
+    getMessages: async () => [{ document: { id: "doc", size: block * 10 }, media: {} }],
+    async *iterDownload(_media, options) {
+      calls.push(Number(options.offset));
+      yield Buffer.alloc(block);
+    },
+  };
+  const stream = adapter.download({ peer: { id: "1", type: "chat" }, id: "1", documentId: "doc", size: block * 10 }, 0, new AbortController().signal);
+  const first = await stream.next();
+  assert.equal(first.value.length, block);
+  // The fallback window is four requests; consuming one starts its replacement
+  // without waiting for the next next() call from the disk writer.
+  assert.deepEqual(calls, [0, block, block * 2, block * 3, block * 4]);
+  await stream.return();
+  assert.equal(calls.length, 5);
+});
+
 test("saved sessions reconnect without interactive prompts", async () => {
   const session="1"+Buffer.concat([Buffer.from([2,0,9]),Buffer.from("127.0.0.1"),Buffer.from([1,187]),Buffer.alloc(256)]).toString("base64");
   let connected=0,saved;

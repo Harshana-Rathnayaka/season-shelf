@@ -442,3 +442,44 @@ test('completed season normalizes space-separated files on disk without changing
   assert.equal(path.basename(f.queue.jobs[2].finalPath),'Show.S01E03.720p.x265.mkv');
   assert.deepEqual(await fs.readFile(f.queue.jobs[2].finalPath),f.data);
 });
+
+test('publishes directly inside selected folder and removes failed temporary data', async t => {
+  const f = await fixture(t, {size:1024});
+  const source = path.join(f.dir, 'source');
+  await fs.writeFile(source, f.data);
+  const final = await publishFile({source, root:f.root, parts:['episode.mkv'], id:'direct', expectedHash:await hashFile(source)});
+  assert.deepEqual(await fs.readFile(final), f.data);
+  f.queue.concurrency = 0;
+  await f.queue.add({items:[f.item],series:'Show',mode:'archive',root:f.root});
+  const job=f.queue.jobs[0];
+  job.parts=['unfinished.mkv']; job.status='failed';
+  await fs.mkdir(f.queue.staging,{recursive:true});
+  const partial=path.join(f.queue.staging,`${job.id}.part`);
+  const transfer=path.join(f.root.path,`.season-shelf-${job.id}.transfer`);
+  await fs.writeFile(partial, f.data); await fs.writeFile(transfer, f.data);
+  const usage={...f.queue.usage};
+  await f.queue.control(job.id,'remove');
+  assert.equal(f.queue.jobs.length,0);
+  await assert.rejects(fs.stat(partial),{code:'ENOENT'});
+  await assert.rejects(fs.stat(transfer),{code:'ENOENT'});
+  assert.deepEqual(f.queue.usage,usage);
+  assert.deepEqual(await fs.readFile(final),f.data);
+});
+
+test('volume-root downloads publish and failed entries can be removed', async t => {
+  const f=await fixture(t,{size:1024});
+  const root=await registerRoot(path.parse(f.dir).root);
+  const destination=path.join(f.root.path,'volume-root.mkv');
+  const parts=path.relative(root.path,destination).split(path.sep);
+  const source=path.join(f.dir,'volume-source'); await fs.writeFile(source,f.data);
+  assert.equal(await publishFile({source,root,parts,id:'volume',expectedHash:await hashFile(source)}),destination);
+  f.queue.concurrency=0;
+  await f.queue.add({items:[f.item],series:'Show',mode:'archive',root:f.root});
+  const job=f.queue.jobs[0]; job.root=root; job.parts=parts; job.status='failed';
+  const transfer=path.join(path.dirname(destination),`.season-shelf-${job.id}.transfer`);
+  await fs.writeFile(transfer,f.data);
+  await f.queue.control(job.id,'remove');
+  assert.equal(f.queue.jobs.length,0);
+  await assert.rejects(fs.stat(transfer),{code:'ENOENT'});
+  assert.deepEqual(await fs.readFile(destination),f.data);
+});

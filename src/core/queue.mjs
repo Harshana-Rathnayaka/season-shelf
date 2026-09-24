@@ -1,3 +1,4 @@
+import { isWithin } from "./paths.mjs";
 import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -216,13 +217,22 @@ export class DownloadQueue extends EventEmitter {
         // Wait for the staging writer to close before deleting on Windows.
         await this.tasks.get(job.id);
         const partial = path.resolve(this.staging, `${job.id}.part`);
-        if (!partial.startsWith(path.resolve(this.staging) + path.sep))
+        if (!isWithin(this.staging, partial))
           throw new Error("Unsafe staging-file destination");
         await fs.rm(partial, {force:true});
         const destination = path.resolve(job.root.path, ...job.parts);
-        if (!destination.startsWith(path.resolve(job.root.path) + path.sep))
+        if (!isWithin(job.root.path, destination))
           throw new Error("Unsafe temporary-file destination");
-        await fs.rm(path.join(path.dirname(destination), `.season-shelf-${job.id}.transfer`), {force:true});
+        const temporary = path.join(path.dirname(destination), `.season-shelf-${job.id}.transfer`);
+        try {
+          await fs.lstat(temporary);
+          await checkRoot(job.root, 0, { requireSpace: false });
+          const parent = await fs.realpath(path.dirname(temporary));
+          const root = await fs.realpath(job.root.path);
+          if (!isWithin(root, parent, { allowRoot: true }))
+            throw new Error("Temporary data resolves outside selected folder");
+          await fs.unlink(temporary);
+        } catch (error) { if (error.code !== "ENOENT") throw error; }
         this.jobs = this.jobs.filter(entry => entry.id !== job.id);
       } catch (error) {
         job.status = completed ? "complete" : "failed";

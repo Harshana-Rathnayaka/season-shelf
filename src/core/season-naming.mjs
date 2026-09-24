@@ -1,3 +1,4 @@
+import { isWithin } from "./paths.mjs";
 import fs from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
@@ -10,7 +11,7 @@ export async function finishRename(job, save) {
   const root = await fs.realpath(job.root.path);
   for (const filename of [from, to]) {
     const parent = await fs.realpath(path.dirname(filename));
-    if (!parent.startsWith(root + path.sep)) throw new Error("Unsafe naming destination");
+    if (!isWithin(root, parent, { allowRoot: true })) throw new Error("Unsafe naming destination");
   }
   let targetExists = false;
   try {

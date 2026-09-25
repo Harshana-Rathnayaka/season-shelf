@@ -12,7 +12,7 @@ export function DownloadRow({ job, onAction }: { job: DownloadRecord; onAction: 
   const episode = `S${pad(job.item.season)}E${pad(job.item.episode)}${(job.item.episodeEnd || 0) > (job.item.episode || 0) ? `-E${pad(job.item.episodeEnd)}` : ""}`;
   const phase = job.status === "checking" ? "Checking the downloaded file before saving it."
     : job.status === "transferring" ? "Saving the file to your chosen folder. The next download can start while this finishes." : null;
-  return <article className="queue-item" data-download-id={job.id}>
+  return <article className="queue-item" data-download-id={job.id} data-status={job.status}>
     <span className="queue-glyph"><Icon name={job.mode === "archive" ? "drive" : "play"} /></span>
     <div className="queue-content">
       <div className="queue-title">

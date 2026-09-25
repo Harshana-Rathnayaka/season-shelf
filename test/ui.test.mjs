@@ -213,10 +213,10 @@ test("keyword editor saves user terms and archive files offer Recycle Bin deleti
 
 test("single season and episode labels are grammatical and controls wrap only essential filters", async t => {
   const item=parseEpisode({id:"1",filename:"Show.S01E01.720p.x265.mkv",size:100});
-  const f=await fixture(t,{catalogue:{channel:{id:"1",title:"Dracula"},items:[item]}});
-  assert.match(f.document.querySelector('.panel-title').textContent,/1 season found/);
-  assert.match(f.document.querySelector('.panel-title').textContent,/1 matching episode/);
-  assert.ok(!f.document.querySelector('.panel-title').textContent.includes('1 seasons'));
+  const f=await fixture(t,{catalogue:{channel:{id:"1",title:"Dracula"},items:[item],scanned:20}});
+  assert.match(f.document.querySelector('.panel-title').textContent,/20 messages checked/);
+  assert.match(f.document.querySelector('.panel-title').textContent,/1 verified/);
+  assert.match(f.document.querySelector('.panel-title').textContent,/0 need review/);
   f.click('[data-action="select-season"]');
   assert.match(f.document.querySelector('.selection-bar').textContent,/1 episode selected/);
   assert.ok(f.document.querySelector('.library-controls .quality-toolbar'));
@@ -686,7 +686,7 @@ test('Closing an authentication prompt cancels it and removes credential control
 
 test('scan progress survives background renders and resets for the next scan',async t=>{
   const item=parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:100});
-  const catalogue={channel:{id:'show',title:'Show'},items:[item]};
+  const catalogue={channel:{id:'show',title:'Show'},items:[item],scanned:246};
   let finishScan;
   const f=await fixture(t,{catalogue,channels:[catalogue.channel],jobs:[],settings:{theme:'dark'}},async method=>{
     if(method==='scan')return new Promise(resolve=>{finishScan=()=>resolve(catalogue);});
@@ -705,6 +705,19 @@ test('scan progress survives background renders and resets for the next scan',as
   assert.equal(f.document.querySelector('#scan-status').textContent,'Scanning channel metadata…');
   finishScan();
   await new Promise(resolve=>setTimeout(resolve,20));
+});
+
+test('scan completion opens review files when nothing can be verified',async t=>{
+  const item=parseEpisode({id:'1',filename:'Show.S01E01.x265.mkv',size:100});
+  assert.match(item.reason,/Resolution/);
+  const initial={channel:{id:'show',title:'Show'},items:[],scanned:0};
+  const result={channel:initial.channel,items:[item],scanned:100};
+  const f=await fixture(t,{catalogue:initial,channels:[initial.channel],jobs:[],settings:{theme:'dark'}},async method=>method==='scan'?result:[]);
+  f.click('[data-action="rescan"]');
+  await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(f.document.querySelector('[data-action="library-tab"][aria-pressed="true"]').dataset.tab,'unverified');
+  assert.match(f.document.querySelector('.panel-title').textContent,/0 verified.*1 need review/);
+  assert.match(f.document.querySelector('#toast').textContent,/0 verified.*1 need review.*100 messages checked/);
 });
 
 test('invalid desktop events leave the last valid queue and lifetime totals intact',async t=>{

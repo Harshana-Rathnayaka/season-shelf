@@ -15,6 +15,7 @@ export function LibraryPage({ state, hasDesktop, onAction }: Props) {
   const seasons = seasonsFor(state);
   const root = state.settings[state.mode === "archive" ? "archiveRoot" : "watchRoot"];
   const needsReview = state.catalogue?.items.filter(item => item.reason).length || 0;
+  const verified = (state.catalogue?.items.length || 0) - needsReview;
   return <main>
     <PageHeader title="Series library" description="Choose a channel, select episodes and save them to your folders." />
     <div className="library-preferences">
@@ -26,7 +27,7 @@ export function LibraryPage({ state, hasDesktop, onAction }: Props) {
     <section className="catalogue-panel library-panel">
       <div className="panel-heading"><div className="panel-title"><span className="series-icon"><Icon name="film" /></span><div>
         <h2>{state.catalogue?.channel.title || "Choose your first series"}</h2>
-        <p>{state.catalogue ? <>{seasons.length} {seasons.length === 1 ? "season" : "seasons"} found <span>·</span> {all.length} matching {all.length === 1 ? "episode" : "episodes"}{state.demo && <> <span>·</span> Illustrative sample</>}</> : "Select a Telegram channel to find its episodes"}</p>
+        <p>{state.catalogue ? <>{state.catalogue.scanned || 0} messages checked <span>·</span> {verified} verified <span>·</span> {needsReview} need review{state.demo && <> <span>·</span> Illustrative sample</>}</> : "Select a Telegram channel to find its episodes"}</p>
       </div></div><div className="row-actions">
         <LibraryButton label="Change series" glyph="folder" command={{ action: "choose-series" }} onAction={onAction} />
         <LibraryButton label="Rescan channel" glyph="refresh" iconOnly command={{ action: "rescan" }} onAction={onAction} disabled={state.busy || !state.catalogue} />

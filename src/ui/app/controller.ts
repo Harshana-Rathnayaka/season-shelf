@@ -142,10 +142,14 @@ async function scan(id: string) {
   render();
   try {
     state.catalogue = state.demo ? demoCatalogue() : await call("scan", { id });
+    const verified = state.catalogue.items.filter(item => !item.reason).length;
+    const review = state.catalogue.items.length - verified;
     state.quality = {};
     state.selected.clear();
     state.query = "";
+    if (!verified && review) state.libraryTab = "unverified";
     state.season = chosen(state)[0]?.season || 1;
+    toast(`Scan complete: ${verified} verified · ${review} need review · ${state.catalogue.scanned || 0} messages checked.`);
   } finally {
     state.busy = false;
     state.scanProgress = undefined;

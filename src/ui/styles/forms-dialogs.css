@@ -179,6 +179,9 @@ dialog input {
   width: 14px;
   color: var(--muted);
 }
+.discovery-results .channel-option > .icon:only-child {
+  margin-left: 0;
+}
 #toast {
   position: fixed;
   bottom: 26px;

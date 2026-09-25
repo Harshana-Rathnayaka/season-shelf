@@ -29,6 +29,8 @@ function EpisodeRow({ item, selected, unverified, onAction }: { item: LibraryIte
 export function EpisodeTable({ state, onAction }: { state: LibraryState; onAction: LibraryActionHandler }) {
   const items = visible(state);
   const unverified = state.libraryTab === "unverified";
+  const needsReview = state.catalogue?.items.filter(item => item.reason).length || 0;
+  const noFiles = !state.catalogue?.items.length;
   const selected = items.filter(item => state.selected.has(item.id)).length;
   const selectAll = useRef<HTMLInputElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -47,6 +49,10 @@ export function EpisodeTable({ state, onAction }: { state: LibraryState; onActio
         {items.map(item => <EpisodeRow key={item.id} item={item} selected={state.selected.has(item.id)} unverified={unverified} onAction={onAction} />)}
       </tbody>
     </table>
-    {!items.length && <div className="empty-inline">No matching episodes here. Try another season or quality mode.</div>}
+    {!items.length && <div className="empty-inline">{noFiles
+      ? "Scan complete. No supported episode video files were found in the messages checked."
+      : !unverified && needsReview
+        ? <>No verified episodes match this view. <button type="button" className="text-button" onClick={() => void onAction({ action: "library-tab", tab: "unverified" })}>Review {needsReview} unverified {needsReview === 1 ? "file" : "files"}</button></>
+        : "No matching episodes here. Try another season or quality mode."}</div>}
   </div>;
 }

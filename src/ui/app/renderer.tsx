@@ -8,6 +8,7 @@ import type { LibraryActionHandler } from "../features/library/types";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import type { SettingsActionHandler, SaveSettings } from "../features/settings/types";
 import { HelpPage, type HelpCommand } from "../features/help/HelpPage";
+import { UiProviders } from "../shared/ui/UiProviders";
 
 import type { AppState } from "./state";
 interface Callbacks {
@@ -25,7 +26,7 @@ export function createRenderer(container: HTMLElement, callbacks: Callbacks) {
   const root = createRoot(container);
   function update(state: AppState, count: number) {
     // The existing controller restores focus/scroll immediately after rendering.
-    flushSync(() => root.render(<AppShell state={state} count={count} onAction={callbacks.onShellAction}>
+    flushSync(() => root.render(<UiProviders><AppShell state={state} count={count} onAction={callbacks.onShellAction}>
       {state.page === "queue"
         ? <DownloadsPage state={state} onAction={callbacks.onDownloadAction} onBrowse={callbacks.onBrowse} />
         : state.page === "library"
@@ -33,7 +34,7 @@ export function createRenderer(container: HTMLElement, callbacks: Callbacks) {
           : state.page === "settings"
             ? <SettingsPage state={state} onSave={callbacks.onSaveSettings} onAction={callbacks.onSettingsAction} />
             : <HelpPage onAction={callbacks.onHelpAction} />}
-    </AppShell>));
+    </AppShell></UiProviders>));
   }
   return {
     render(state: AppState, count: number) {

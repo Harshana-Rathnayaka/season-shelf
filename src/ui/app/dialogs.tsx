@@ -10,6 +10,7 @@ import { SystemDialog, type SystemDialogView } from "../features/settings/System
 import { WatchDialog, type WatchDialogView } from "../features/library/WatchDialog";
 import { FileDetailsDialog } from "../features/downloads/components/FileDetailsDialog";
 import type { DownloadRecord } from "../features/downloads/types";
+import { UiProviders } from "../shared/ui/UiProviders";
 
 export type DialogView = AccountView | DiscoveryView | SystemDialogView | WatchDialogView
   | { kind: "file-details"; job: DownloadRecord }
@@ -34,7 +35,7 @@ export function createDialogs(element: HTMLDialogElement, callbacks: DialogCallb
   let revision = 0;
   function render() {
     const view = current;
-    flushSync(() => root.render(view ? <div key={revision} className="dialog-content"><DialogButton label="Close dialog" glyph="close" iconOnly className="dialog-close icon-button" action="close-dialog" onAction={callbacks.onAction} /><Content view={view} {...callbacks} /></div> : null));
+    flushSync(() => root.render(view ? <UiProviders><div key={revision} className="dialog-content"><DialogButton label="Close dialog" glyph="close" iconOnly className="dialog-close icon-button" action="close-dialog" onAction={callbacks.onAction} /><Content view={view} {...callbacks} /></div></UiProviders> : null));
     const heading = element.querySelector("h2");
     if (heading) { heading.id = "dialog-heading"; element.setAttribute("aria-labelledby", heading.id); }
   }

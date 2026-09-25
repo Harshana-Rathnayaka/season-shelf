@@ -18,9 +18,9 @@ body {
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb { background: var(--border-strong); border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
 
-.workspace-shell main { animation: page-in .28s var(--ease-out) both; }
+.workspace-shell main { animation: page-in .24s var(--ease-out) both; }
 @keyframes page-in {
-  from { opacity: 0; transform: translateY(5px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -85,7 +85,9 @@ body {
 .queue-item {
   position: relative;
   transition: background .18s, border-color .18s;
+  animation: queue-item-in .2s var(--ease-out) both;
 }
+@keyframes queue-item-in { from { opacity: 0; transform: translateY(5px); } }
 .queue-item:hover { background: color-mix(in srgb, var(--hover) 55%, transparent); }
 .queue-item[data-status="downloading"]::before {
   content: "";
@@ -156,14 +158,32 @@ dialog::backdrop { opacity: 1; transition: opacity .2s, display .2s allow-discre
 .account-popover { transform-origin: left bottom; animation: popover-in .18s var(--ease-out) both; }
 @keyframes popover-in { from { opacity: 0; transform: translateY(6px) scale(.98); } }
 
+.control-tooltip {
+  z-index: 120;
+  max-width: 260px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow-soft);
+  font-size: calc(12px * var(--font-scale, 1));
+  line-height: 1.35;
+  animation: tooltip-in .14s var(--ease-out) both;
+}
+.control-tooltip-arrow { fill: var(--text); }
+@keyframes tooltip-in { from { opacity: 0; transform: translateY(2px) scale(.98); } }
+
 #toast { border: 1px solid color-mix(in srgb, var(--bg) 18%, transparent); box-shadow: var(--shadow-float); }
 .empty-symbol { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 6%, transparent); }
 .empty-inline .text-button { margin-left: 4px; padding-block: 4px; }
 
 @media (prefers-reduced-motion: reduce) {
   .workspace-shell main,
+  .queue-item,
   .account-popover,
   .status-downloading::before,
-  .notice[role="status"]::after { animation: none; }
+  .notice[role="status"]::after,
+  .control-tooltip { animation: none; }
   dialog { transition: none; }
 }

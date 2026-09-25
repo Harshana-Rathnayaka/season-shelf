@@ -19,6 +19,7 @@ async function fixture(t, bootstrap = null, handler = null) {
     return {ok:true,data:method === "bootstrap" ? {...bootstrap,connected:true,demo:false} : []};
   } };
   window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
+  window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
   window.HTMLDialogElement.prototype.showModal = function () {
     this.open = true;
   };

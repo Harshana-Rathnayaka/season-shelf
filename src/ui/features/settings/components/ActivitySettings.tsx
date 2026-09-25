@@ -17,6 +17,6 @@ export function ActivitySettings({ state, onAction }: { state: SettingsState; on
       <p>Current jobs, including paused and cancelled entries, are preserved. Cleanup uses the Recycle Bin.</p>
     </div>
     <div className="usage-settings"><h3>Lifetime activity</h3><UsageSummary usage={state.usage} /><p>Measured since {state.usage.since ? new Date(state.usage.since).toLocaleString() : "this update"}. Received data includes retries. Saved data counts successfully completed downloads. These totals remain after deleting files and exclude activity before tracking began.</p><SettingsButton label="Reset lifetime totals" command={{ action: "reset-activity" }} onAction={onAction} /></div>
-    <div className="setting-row"><div><h3>Clear app data</h3><p>Reset history, the selected series, series watches and lifetime totals. Keeps downloaded files, partials, your login and preferences.</p></div><SettingsButton label="Clear app data" command={{ action: "clear-app-data" }} onAction={onAction} /></div>
+    <div className="setting-row"><div><h3>Clear app data</h3><p>Reset history, the selected series, series watches and lifetime totals. Removes unfinished download data; keeps completed files, your login and preferences.</p></div><SettingsButton label="Clear app data" command={{ action: "clear-app-data" }} onAction={onAction} /></div>
   </section>;
 }

@@ -178,10 +178,10 @@ app
     handle("clear-app-data",async()=>{
       const busy=()=>scanning || discovery.operation || authPrompt || adapter.connecting || watcher.checking || queue.running.size || queue.namingLocks.size;
       if(busy()) throw new Error("Pause downloads and finish current operations before clearing app data.");
-      const answer=await confirmInApp({type:"warning",title:"Clear app data?",message:"Clear download history and the current library?",detail:"Also clears saved-file history, series watches and lifetime totals. Downloaded media and partial files stay on disk. Your Telegram login, preferences and completed guide are kept. Cleared file history cannot be restored from the app.",buttons:["Keep data","Clear app data"],defaultId:0,cancelId:0});
+      const answer=await confirmInApp({type:"warning",title:"Clear app data?",message:"Clear download history and the current library?",detail:"Also removes unfinished download data, series watches and lifetime totals. Completed files stay on disk. Your Telegram login, preferences and completed guide are kept. Cleared history cannot be restored from the app.",buttons:["Keep data","Clear app data"],defaultId:0,cancelId:0});
       if(answer.response!==1) return {cleared:false};
       if(busy()) throw new Error("An operation started. Wait for it to finish and try again.");
-      const data=clearWorkspace(queue,store,watcher);channels=[];catalogue=null;discovery.choices.clear();
+      const data=await clearWorkspace(queue,store,watcher);channels=[];catalogue=null;discovery.choices.clear();
       return {cleared:true,...data};
     });
     handle("reset-activity",async()=>{

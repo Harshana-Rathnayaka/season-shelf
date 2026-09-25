@@ -346,7 +346,7 @@ export class DownloadQueue extends EventEmitter {
             written += bytesWritten;
           }
           job.received += chunk.length;
-          if (Date.now() - tick > 500) {
+          if (Date.now() - tick > 1500) {
             job.speed =
               (job.received - baseline) / ((Date.now() - tick) / 1000);
             tick = Date.now();

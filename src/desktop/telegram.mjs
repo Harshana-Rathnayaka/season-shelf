@@ -136,8 +136,10 @@ export class TelegramAdapter {
       throw new Error("This channel restricts saving content");
     const items = [];
     let scanned = 0;
+    let lastMessageId = minId;
     for await (const message of client.iterMessages(input, { limit, minId })) {
       scanned++;
+      lastMessageId = Math.max(lastMessageId, Number(message.id));
       const doc = message.document;
       if (doc && !message.noforwards) {
         const filename =
@@ -161,6 +163,7 @@ export class TelegramAdapter {
       channel,
       items,
       scanned,
+      lastMessageId,
       truncated: scanned >= limit,
       scannedAt: new Date().toISOString(),
     };

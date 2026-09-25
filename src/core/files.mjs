@@ -97,29 +97,32 @@ export async function publishFile({ source, root, parts, id, expectedHash }) {
     path.dirname(final),
     `.season-shelf-${id}.transfer`,
   );
-  await fs.copyFile(source, temporary);
-  if ((await hashFile(temporary)) !== expectedHash)
-    throw new Error("Transfer verification failed; original retained");
-  await checkRoot(root);
   try {
-    // Exclusive link publishes atomically on NTFS and standard Unix filesystems.
-    await fs.link(temporary, final);
-  } catch (error) {
-    if (error.code === "EEXIST")
-      throw new Error(
-        "Destination appeared during transfer; original retained",
-      );
-    if (
-      !["ENOTSUP", "EPERM", "EOPNOTSUPP", "EXDEV", "ENOSYS"].includes(
-        error.code,
-      )
-    )
-      throw error;
-    // exFAT lacks hard links. COPYFILE_EXCL preserves the no-overwrite guarantee.
-    await fs.copyFile(temporary, final, constants.COPYFILE_EXCL);
-    if ((await hashFile(final)) !== expectedHash)
-      throw new Error("Final copy verification failed; original retained");
+    await fs.copyFile(source, temporary);
+    if ((await hashFile(temporary)) !== expectedHash)
+      throw new Error("Transfer verification failed; original retained");
+    await checkRoot(root);
+    try {
+      // Exclusive link publishes atomically on NTFS and standard Unix filesystems.
+      await fs.link(temporary, final);
+    } catch (error) {
+      if (error.code === "EEXIST")
+        throw new Error("Destination appeared during transfer; original retained");
+      if (!["ENOTSUP", "EPERM", "EOPNOTSUPP", "EXDEV", "ENOSYS"].includes(error.code))
+        throw error;
+      // exFAT lacks hard links. COPYFILE_EXCL preserves the no-overwrite guarantee.
+      await fs.copyFile(temporary, final, constants.COPYFILE_EXCL);
+      if ((await hashFile(final)) !== expectedHash)
+        throw new Error("Final copy verification failed; original retained");
+    }
+    return final;
+  } finally {
+    // Do not follow a replaced destination directory when cleaning up.
+    try {
+      await checkRoot(root, 0, { requireSpace: false });
+      const parent = await fs.realpath(path.dirname(temporary));
+      if (isWithin(root.path, parent, { allowRoot: true }))
+        await fs.rm(temporary, { force: true });
+    } catch { /* A later queue removal can retry cleanup if the drive changed. */ }
   }
-  await fs.rm(temporary, { force: true });
-  return final;
 }

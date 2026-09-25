@@ -313,6 +313,15 @@ test("publish recognises an already verified destination after a restart", async
   const second = await publishFile(args);
   assert.equal(first, second);
 });
+test('failed transfer verification removes its temporary destination copy', async t => {
+  const f=await fixture(t,{size:1024});
+  const source=path.join(f.dir,'source');await fs.writeFile(source,f.data);
+  const destination=path.join(f.root.path,'episode.mkv');
+  await assert.rejects(publishFile({source,root:f.root,parts:['episode.mkv'],id:'bad-hash',expectedHash:'wrong'}),/Transfer verification failed/);
+  await assert.rejects(fs.stat(path.join(f.root.path,'.season-shelf-bad-hash.transfer')),{code:'ENOENT'});
+  await assert.rejects(fs.stat(destination),{code:'ENOENT'});
+  assert.deepEqual(await fs.readFile(source),f.data);
+});
 
 test("bulk pause, cancel and resume affect unfinished jobs and removal persists", async (t) => {
   const f = await fixture(t);

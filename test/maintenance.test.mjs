@@ -54,12 +54,16 @@ test('deleting a missing saved file clears its entry without reporting a filesys
   assert.equal(result.failures.length,0);assert.equal(saved,1);assert.equal(queue.namingLocks.size,0);
 });
 
-test('workspace reset clears metadata atomically while retaining media and account preferences',async t=>{
+test('workspace reset removes partials before clearing metadata and retains completed media and preferences',async t=>{
   const {clearWorkspace}=await import('../src/core/reset.mjs');const dir=await fs.mkdtemp(path.join(os.tmpdir(),'shelf-reset-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const file=path.join(dir,'saved.mkv');await fs.writeFile(file,'keep media');
-  const data={credentials:'encrypted',settings:{theme:'dark'},onboardingComplete:true,jobs:[{finalPath:file}]};const store={setMany(values){Object.assign(data,values);}};
-  const queue={jobs:data.jobs,running:new Map(),namingLocks:new Set(),emit(){}};const watcher={watches:[{}]};
-  clearWorkspace(queue,store,watcher);assert.deepEqual(data.jobs,[]);assert.equal(data.catalogue,null);assert.equal(data.usage.payloadBytes,0);assert.equal(data.credentials,'encrypted');assert.equal(data.onboardingComplete,true);assert.equal(await fs.readFile(file,'utf8'),'keep media');
-  queue.running.set('active',{});assert.throws(()=>clearWorkspace(queue,store,watcher),/Pause downloads/);
+  const staging=path.join(dir,'staging');await fs.mkdir(staging);
+  const pendingId='11111111-1111-4111-8111-111111111111';const orphanId='22222222-2222-4222-8222-222222222222';
+  await fs.writeFile(path.join(staging,pendingId+'.part'),'pending');await fs.writeFile(path.join(staging,orphanId+'.part'),'orphan');
+  const data={credentials:'encrypted',settings:{theme:'dark'},onboardingComplete:true,jobs:[{id:'done',status:'complete',finalPath:file},{id:pendingId,status:'paused'}]};const store={setMany(values){Object.assign(data,values);}};
+  const queue={jobs:data.jobs,staging,running:new Map(),namingLocks:new Set(),emit(){},pump(){},control(id,action){if(action==='pause')return;return fs.rm(path.join(staging,id+'.part')).then(()=>{this.jobs=this.jobs.filter(job=>job.id!==id);});}};const watcher={watches:[{}]};
+  await clearWorkspace(queue,store,watcher);assert.deepEqual(data.jobs,[]);assert.equal(data.catalogue,null);assert.equal(data.usage.payloadBytes,0);assert.equal(data.credentials,'encrypted');assert.equal(data.onboardingComplete,true);assert.equal(await fs.readFile(file,'utf8'),'keep media');
+  assert.deepEqual(await fs.readdir(staging),[]);
+  queue.running.set('active',{});await assert.rejects(clearWorkspace(queue,store,watcher),/Pause downloads/);
   queue.running.clear();queue.removals=new Map([['cleaning',Promise.resolve()]]);
-  assert.throws(()=>clearWorkspace(queue,store,watcher),/Pause downloads/);
+  await assert.rejects(clearWorkspace(queue,store,watcher),/Pause downloads/);
 });

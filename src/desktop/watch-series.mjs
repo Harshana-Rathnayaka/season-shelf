@@ -11,9 +11,10 @@ export class SeriesWatcher {
     selectEpisodes(catalogue.items,mode,quality);
     if(automatic && !root) throw new Error("Choose a download folder first");
     const key=`${catalogue.channel.id}:${mode}`;
+    const previous=this.watches.find(watch=>watch.key===key);
     this.watches=this.watches.filter(watch=>watch.key!==key);
     if(automatic!==null) {
-      this.watches.push({key,channel:catalogue.channel,mode,quality,automatic,root,lastId:Math.max(0,...catalogue.items.map(item=>Number(item.id))),createdAt:Date.now()});
+      this.watches.push({key,channel:catalogue.channel,mode,quality,automatic,root,lastId:Math.max(previous?.lastId || 0,catalogue.lastMessageId || 0,...catalogue.items.map(item=>Number(item.id))),createdAt:Date.now()});
     }
     this.store.set('watches',this.watches);return this.watches;
   }
@@ -30,7 +31,7 @@ export class SeriesWatcher {
           const items=missingEpisodes(selectEpisodes(catalogue.items,watch.mode,watch.quality),reserved,watch.channel.id,watch.mode);
           if(watch.automatic && items.length) await this.queue.add({items,series:watch.channel.title,mode:watch.mode,root:watch.root});
           if(items.length) this.notify({title:watch.channel.title,count:items.length,automatic:watch.automatic});
-          watch.lastId=Math.max(watch.lastId,...catalogue.items.map(item=>Number(item.id)));watch.error='';watch.checkedAt=Date.now();
+          watch.lastId=Math.max(watch.lastId,catalogue.lastMessageId || 0,...catalogue.items.map(item=>Number(item.id)));watch.error='';watch.checkedAt=Date.now();
         } catch(error) {watch.error=error.message;}
       }
       this.store.set('watches',this.watches);

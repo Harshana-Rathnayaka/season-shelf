@@ -318,7 +318,7 @@ async function dispatchAction(action: string, data: DialogActionData & {page?: P
       );
     } else if (action === "show-guide") { showGuide();
     } else if (action === "clear-app-data") {
-      const result=await call("clear-app-data");if(result.cleared){Object.assign(state,result);state.selected.clear();state.libraryTab="verified";state.query="";state.season=1;state.stagingInfo=null;render();toast("App data cleared. Files on disk were kept.");}
+      const result=await call("clear-app-data");if(result.cleared){Object.assign(state,result);state.selected.clear();state.libraryTab="verified";state.query="";state.season=1;state.stagingInfo=null;render();toast("App data and unfinished downloads cleared. Completed files were kept.");}
     } else if (action === "reset-activity") { state.usage=await call("reset-activity");render();
     } else if (action === "licenses") {
       const entries=await call("licenses");dialogs.show({kind:"licenses",entries});

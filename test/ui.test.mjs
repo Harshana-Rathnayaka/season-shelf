@@ -701,6 +701,9 @@ test('scan progress survives background renders and resets for the next scan',as
   finishScan();
   await new Promise(resolve=>setTimeout(resolve,20));
   assert.equal(f.document.querySelector('#scan-status'),null);
+  assert.match(f.document.querySelector('.panel-title').textContent,/246 messages checked.*1 verified/);
+  assert.equal(f.document.querySelectorAll('tbody tr').length,1);
+  assert.match(f.document.querySelector('#toast').textContent,/1 verified.*246 messages checked/);
   f.emit({type:'scan-progress',data:{scanned:999,found:90}});
   f.click('[data-action="rescan"]');
   assert.equal(f.document.querySelector('#scan-status').textContent,'Scanning channel metadata…');
@@ -719,6 +722,27 @@ test('scan completion opens review files when nothing can be verified',async t=>
   assert.equal(f.document.querySelector('[data-action="library-tab"][aria-pressed="true"]').dataset.tab,'unverified');
   assert.match(f.document.querySelector('.panel-title').textContent,/0 verified.*1 need review/);
   assert.match(f.document.querySelector('#toast').textContent,/0 verified.*1 need review.*100 messages checked/);
+});
+
+for (const event of [
+  {type:'queue',data:[]},
+  {type:'usage',data:{payloadBytes:1234,publishedBytes:0,completedFiles:0}},
+  {type:'updates',data:{state:'idle'}},
+  {type:'connection',data:{connected:true}},
+]) test(`scan result survives an intervening ${event.type} event`,async t=>{
+  const catalogue={channel:{id:'show',title:'Show'},items:[parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:100})],scanned:185};
+  let finishScan;
+  const f=await fixture(t,{catalogue,channels:[catalogue.channel],jobs:[],settings:{theme:'dark'}},async method=>{
+    if(method==='scan')return new Promise(resolve=>{finishScan=()=>resolve(catalogue);});
+    return [];
+  });
+  f.click('[data-action="rescan"]');
+  f.emit(event);
+  finishScan();
+  await new Promise(resolve=>setTimeout(resolve,20));
+  assert.match(f.document.querySelector('.panel-title').textContent,/185 messages checked.*1 verified/);
+  assert.equal(f.document.querySelectorAll('tbody tr').length,1);
+  assert.match(f.document.querySelector('#toast').textContent,/1 verified.*185 messages checked/);
 });
 
 test('invalid desktop events leave the last valid queue and lifetime totals intact',async t=>{

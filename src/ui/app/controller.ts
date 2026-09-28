@@ -35,7 +35,9 @@ const renderer = createRenderer(appElement, {
   onBrowse: () => { state.page = "library"; render(); },
 });
 const dialogs = createDialogs(dialogElement, {onAction:dispatchDialog,onSubmit:dispatchForm});
-let state = createInitialState(!!window.shelf);
+// Async commands retain this object across awaits. Background events must update
+// it in place, or their completed responses are written into abandoned state.
+const state = createInitialState(!!window.shelf);
 const presentation = createPresentation(() => state, call, toastElement);
 const {toast, applyTheme} = presentation;
 const discovery = createDiscovery({call,dialogs,onJoined:async joined => {
@@ -351,23 +353,23 @@ if (window.shelf) {
     if(type === "confirmation") {
       dialogs.show({kind:"confirmation",...data});
     } else if(type === "new-episodes") toast(`${data.count} new files in ${data.title}${data.automatic ? " queued." : ". Rescan the channel to view them."}`);
-    else if(type === "updates") {state=reduceBackgroundEvent(state,{type,data});if(state.page==="settings") render();if(data.state==="ready"){updatePrompt();if(!$("#update-error"))toast("Update ready. Open Settings to restart and install.");}}
+    else if(type === "updates") {Object.assign(state,reduceBackgroundEvent(state,{type,data}));if(state.page==="settings") render();if(data.state==="ready"){updatePrompt();if(!$("#update-error"))toast("Update ready. Open Settings to restart and install.");}}
     else if (type === "connection") {
-      state=reduceBackgroundEvent(state,{type,data});
+      Object.assign(state,reduceBackgroundEvent(state,{type,data}));
       render();
       if (data.connectionError) toast("Saved session could not reconnect. Use Connect Telegram to retry.",true);
     } else if (type === "usage") {
-      state=reduceBackgroundEvent(state,{type,data});
+      Object.assign(state,reduceBackgroundEvent(state,{type,data}));
       if (state.page === "queue" || state.page === "settings") render();
     } else if (type === "queue") {
       if (state.demo) {
         if (liveSnapshot) liveSnapshot.jobs = data;
       } else {
-        state=reduceBackgroundEvent(state,{type,data});
+        Object.assign(state,reduceBackgroundEvent(state,{type,data}));
         if (state.page === "queue") render();else refreshQueueBadge();
       }
     } else if (type === "scan-progress") {
-      state=reduceBackgroundEvent(state,{type,data});
+      Object.assign(state,reduceBackgroundEvent(state,{type,data}));
       if(state.busy && state.page==="library")render();
     }
     else if (type === "auth-error") toast(data, true);

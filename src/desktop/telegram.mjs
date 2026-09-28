@@ -137,10 +137,13 @@ export class TelegramAdapter {
     const items = [];
     let scanned = 0;
     let lastMessageId = minId;
-    for await (const message of client.iterMessages(input, { limit, minId })) {
+    for await (const message of this.history(input, { limit, minId })) {
       scanned++;
       lastMessageId = Math.max(lastMessageId, Number(message.id));
-      const doc = message.document;
+      const mediaDocument = message.media instanceof Api.MessageMediaDocument
+        ? message.media.document
+        : message.media instanceof Api.MessageMediaWebPage ? message.media.webpage?.document : null;
+      const doc = message.document || (mediaDocument instanceof Api.Document ? mediaDocument : null);
       if (doc && !message.noforwards) {
         const filename =
           doc.attributes.find(
@@ -167,6 +170,35 @@ export class TelegramAdapter {
       truncated: scanned >= limit,
       scannedAt: new Date().toISOString(),
     };
+  }
+  async *history(input, { limit, minId }) {
+    const client = this.requireClient();
+    let offsetId = 0;
+    let remaining = limit;
+    while (remaining > 0) {
+      // Teleproto's iterator ends the whole scan on an out-of-range message,
+      // including Telegram's id=0 empty placeholders. Page explicitly so a
+      // placeholder cannot hide the real messages that follow it.
+      const page = await client.invoke(new Api.messages.GetHistory({
+        peer: input, offsetId, offsetDate: 0, addOffset: 0,
+        limit: Math.min(100, remaining), maxId: 0, minId: 0, hash: bigInt.zero,
+      }));
+      if (!Array.isArray(page.messages))
+        throw new Error("Telegram did not return channel history. Please rescan.");
+      if (!page.messages.length) return;
+      const messages = page.messages.filter(message =>
+        Number.isSafeInteger(message.id) && message.id > 0 &&
+        (!offsetId || message.id < offsetId)
+      ).sort((a, b) => b.id - a.id);
+      if (!messages.length)
+        throw new Error("Telegram returned unreadable channel history. Please rescan.");
+      for (const message of messages) {
+        if (message.id <= minId) return;
+        yield message;
+        if (--remaining === 0) return;
+      }
+      offsetId = messages.at(-1).id;
+    }
   }
   async *download(item, offset, signal) {
     const client = this.requireClient();

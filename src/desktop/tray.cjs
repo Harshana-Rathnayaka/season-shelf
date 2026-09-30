@@ -24,7 +24,7 @@ exports.installTray = ({win,queue,settings,isQuitting,enabled=true}) => {
   queue.on('change',jobs=>{
     const fresh=jobs.filter(job=>job.status==='complete' && !completed.has(job.id));
     fresh.forEach(job=>completed.add(job.id));
-    if(fresh.length && Notification.isSupported()) {
+    if(fresh.length && settings().downloadCompleteNotifications !== false && Notification.isSupported()) {
       const notice=new Notification({title:'Download complete',body:fresh.length===1?fresh[0].item.filename:`${fresh.length} files saved`});
       notice.on('click',show);notice.show();
     }

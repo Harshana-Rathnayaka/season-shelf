@@ -9,7 +9,7 @@ const searchBot = "MCF_SeriesBot";
 const channelRecord = entity => ({id:String(entity.id),title:entity.title || "Series channel",peer:{id:String(entity.id),type:"channel",accessHash:String(entity.accessHash || 0)}});
 
 export class Discovery {
-  constructor(adapter, {wait = delay, now = Date.now, timeout = 30000} = {}) {
+  constructor(adapter, {wait = delay, now = Date.now, timeout = 15000} = {}) {
     Object.assign(this,{adapter,wait,now,timeout});
     this.choices = new Map();
     this.searchGroups = new Map();
@@ -142,7 +142,8 @@ export class Discovery {
       const next = JSON.stringify(snapshot.map(message=>[message.id,message.message,discoveryLinks(message)]));
       if (next !== fingerprint) { fingerprint = next; changed = this.now(); }
       if (snapshot.some(message=>discoveryLinks(message).length) && this.now() - changed >= 5000) break;
-      await this.wait(1500,undefined,{signal});
+      const remaining = this.timeout - (this.now() - started);
+      if (remaining > 0) await this.wait(Math.min(1500,remaining),undefined,{signal});
     }
     signal.throwIfAborted();
     // Thread reads may omit or lag inline keyboard edits. Fetch the actual

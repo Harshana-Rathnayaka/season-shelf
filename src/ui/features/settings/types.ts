@@ -5,6 +5,7 @@ export interface Settings {
   theme?: Theme;
   concurrency?: number;
   closeToTray?: boolean;
+  downloadCompleteNotifications?: boolean;
   sidebarCollapsed?: boolean;
   archiveRoot?: { path: string } | null;
   watchRoot?: { path: string } | null;

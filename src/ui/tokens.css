@@ -21,22 +21,22 @@
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f5f6f4;
-  --sidebar: #fafbf9;
-  --surface: #ffffff;
-  --subtle: #f7f8f6;
-  --hover: #eef1ed;
-  --text: #202c27;
-  --secondary: #4e6258;
-  --muted: #6c7b73;
-  --border: #e0e6df;
-  --border-strong: #c6d0c7;
-  --accent: #267354;
-  --accent-ink: #ffffff;
-  --accent-soft: #30795809;
-  --accent-border: #8db49a;
-  --tag-bg: #f1f4ef;
-  --row-selected: #30795804;
-  --orbit: #42785835;
-  --warning: #926131;
+  --bg: #e5e3dc;
+  --sidebar: #dedfd7;
+  --surface: #eeece5;
+  --subtle: #e8e6df;
+  --hover: #dbdfd5;
+  --text: #303832;
+  --secondary: #505b52;
+  --muted: #5b645a;
+  --border: #cccfc3;
+  --border-strong: #a8b09f;
+  --accent: #426950;
+  --accent-ink: #f3f0e7;
+  --accent-soft: #42695010;
+  --accent-border: #8eaa92;
+  --tag-bg: #dfe3d8;
+  --row-selected: #4269500e;
+  --orbit: #647e5e30;
+  --warning: #7b572e;
 }

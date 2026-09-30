@@ -39,16 +39,21 @@ test('production updater rejects prereleases even after provider fallback',async
   updater.emit('update-downloaded',{version:'1.1.0'});await handlers['update-install']();assert.equal(installs,1);
 });
 test('tray keeps the app open until explicit quit and notifies a completion only once',async()=>{
-  const notices=[];let hidden=0,quitting=false,pauses=0,closeToTray=true;
+  const notices=[];let hidden=0,quitting=false,pauses=0,closeToTray=true,downloadCompleteNotifications;
   class Tray extends EventEmitter {setToolTip(){} setContextMenu(menu){this.menu=menu;}}
   class Notification extends EventEmitter {static isSupported(){return true;}constructor(value){super();notices.push(value);}show(){}}
   const {installTray}=await load('src/desktop/tray.cjs',{Tray,Notification,Menu:{buildFromTemplate:value=>value},nativeImage:{createFromBitmap:()=>({})},app:{quit:()=>{quitting=true;}}});
   const win=new EventEmitter();Object.assign(win,{hide:()=>{hidden++;},show(){},isMinimized:()=>false,focus(){}});
   const queue=new EventEmitter();queue.jobs=[];queue.controlAll=action=>{if(action==="pause")pauses++;};
-  const tray=installTray({win,queue,settings:()=>({closeToTray}),isQuitting:()=>quitting});
+  const tray=installTray({win,queue,settings:()=>({closeToTray,downloadCompleteNotifications}),isQuitting:()=>quitting});
   let prevented=0;win.emit('close',{preventDefault:()=>{prevented++;}});assert.equal(hidden,1);assert.equal(prevented,1);assert.equal(pauses,1);
   closeToTray=false;win.emit("close",{preventDefault:()=>{prevented++;}});assert.equal(pauses,2);assert.equal(hidden,1);
   const job={id:'1',status:'complete',item:{filename:'episode.mkv'}};queue.emit('change',[job]);queue.emit('change',[job]);assert.equal(notices.length,1);
+  downloadCompleteNotifications=false;
+  const mutedJob={...job,id:'2'};queue.emit('change',[job,mutedJob]);assert.equal(notices.length,1);
+  downloadCompleteNotifications=true;
+  queue.emit('change',[job,mutedJob]);assert.equal(notices.length,1);
+  queue.emit('change',[job,mutedJob,{...job,id:'3'}]);assert.equal(notices.length,2);
   tray.menu.at(-1).click();win.emit('close',{preventDefault:()=>{prevented++;}});assert.equal(prevented,1);
 });
 

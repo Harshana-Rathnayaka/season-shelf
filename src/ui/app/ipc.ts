@@ -22,7 +22,7 @@ const job = object({ id: text, series: text, mode: oneOf("archive", "watch"),
 const jobs = array(job);
 const folder = optional(nullable(object({ path: text })));
 const settings = object({ theme: optional(oneOf("dark", "light", "system")), concurrency: maybeNumber,
-  closeToTray: maybeBoolean, sidebarCollapsed: maybeBoolean, archiveRoot: folder, watchRoot: folder,
+  closeToTray: maybeBoolean, downloadCompleteNotifications: maybeBoolean, sidebarCollapsed: maybeBoolean, archiveRoot: folder, watchRoot: folder,
   appearance: optional(object({ size: maybeNumber, weight: maybeNumber, accent: maybeText, text: maybeText })),
   transfer: optional(object({ speedKiB: maybeNumber, scheduled: maybeBoolean, start: maybeText, end: maybeText })),
   hiddenKeywords: optional(array(text)) });

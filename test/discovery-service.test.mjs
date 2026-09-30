@@ -4,6 +4,14 @@ import { Discovery } from "../src/desktop/discovery.mjs";
 import { Api } from "teleproto";
 import { advanceDiscovery } from "../src/ui/features/discovery/flow.ts";
 
+test('reply collection stops after the default 15-second window',async()=>{
+  let time=0,reads=0;
+  const service=new Discovery({}, {now:()=>time,wait:async ms=>{time+=ms;}});
+  await service.responses({getMessages:async()=>{reads++;time+=200;return [];}},{id:1},0,new AbortController().signal);
+  assert.equal(time,15000);
+  assert.ok(reads>0);
+});
+
 function fixture(client) {
   let time=0;
   return new Discovery({requireClient:()=>client},{now:()=>time,wait:async(ms)=>{time+=ms;},timeout:12000});

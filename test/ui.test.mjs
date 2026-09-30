@@ -267,6 +267,7 @@ test("discovery sends only a submitted query and continues after explicit result
     return [];
   });
   f.click('[data-action="choose-series"]');
+  assert.equal(f.document.activeElement, f.document.querySelector('#channel-search'));
   f.click('[data-action="discover"]');
   assert.equal(f.calls.some(call=>call.method==='discovery-search'),false);
   assert.equal(f.document.querySelector('#discovery-form'),null);
@@ -274,8 +275,9 @@ test("discovery sends only a submitted query and continues after explicit result
   await new Promise(resolve=>setTimeout(resolve,0));
   assert.match(f.document.querySelector('#dialog').textContent,/Other members can see it/);
   const form=f.document.querySelector('#discovery-form');
+  assert.equal(f.document.activeElement, form.elements.query);
   form.elements.query.value='Banshee';
-  form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));
+  form.elements.query.dispatchEvent(new f.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
   await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(f.calls.find(call=>call.method==='discovery-search').payload.query,'Banshee');
   assert.equal(f.calls.find(call=>call.method==='discovery-search').payload.sourceId,'source-token');
@@ -457,6 +459,16 @@ test('empty and unverified-only channels keep quality, tab and search controls i
       assert.ok(f.document.querySelector('.library-controls > .catalogue-tools .table-search'));
     }
   }
+});
+
+test('download completion notifications default on and retain the saved preference',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async(method,payload)=>method==='settings'?payload:{});
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  const select=f.document.querySelector('#download-complete-notifications');assert.equal(select.value,'on');
+  select.value='off';select.dispatchEvent(new f.window.Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.find(c=>c.method==='settings').payload.downloadCompleteNotifications,false);
+  f.click('[data-page="queue"]');f.click('[data-page="settings"]');
+  assert.equal(f.document.querySelector('#download-complete-notifications').value,'off');
 });
 
 test('disabled schedule retains chosen hours and enabling it restores both time inputs',async t=>{

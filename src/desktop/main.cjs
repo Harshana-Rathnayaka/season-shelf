@@ -308,6 +308,7 @@ app
     handle("settings", (payload) => {
       if (payload.transfer !== undefined) {settings.transfer=cleanTransfer(payload.transfer);adapter.transferPolicy.configure(settings.transfer);}
       if(typeof payload.closeToTray === "boolean") settings.closeToTray=payload.closeToTray;
+      if(typeof payload.downloadCompleteNotifications === "boolean") settings.downloadCompleteNotifications=payload.downloadCompleteNotifications;
       if (payload.appearance !== undefined) settings.appearance = cleanAppearance(payload.appearance);
       if (payload.hiddenKeywords !== undefined) settings.hiddenKeywords = cleanKeywords(payload.hiddenKeywords);
       if (typeof payload.sidebarCollapsed === "boolean")

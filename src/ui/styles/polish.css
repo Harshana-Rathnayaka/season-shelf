@@ -8,6 +8,13 @@
   --ease-out: cubic-bezier(.2, .8, .2, 1);
 }
 
+:root[data-theme="light"] {
+  --shadow-float: 0 16px 44px #30382a24;
+  --shadow-soft: 0 1px 2px #30382a0a, 0 6px 18px #30382a06;
+}
+
+:root[data-theme="light"] #dialog::backdrop { background: #30382a66; }
+
 body {
   background:
     radial-gradient(900px 480px at 88% -12%, var(--accent-soft), transparent 68%),
@@ -68,18 +75,7 @@ body {
 .queue-summary > div {
   position: relative;
   overflow: hidden;
-  transition: border-color .18s, transform .18s var(--ease-out);
 }
-.queue-summary > div::after {
-  content: "";
-  position: absolute;
-  inset: auto 16px 0;
-  height: 2px;
-  border-radius: 999px 999px 0 0;
-  background: var(--accent);
-  opacity: .35;
-}
-.queue-summary > div:hover { border-color: var(--border-strong); transform: translateY(-1px); }
 .queue-summary strong { font-variant-numeric: tabular-nums; }
 
 .queue-item {

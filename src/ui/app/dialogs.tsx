@@ -49,6 +49,7 @@ export function createDialogs(element: HTMLDialogElement, callbacks: DialogCallb
       revision++;
       render();
       if (!element.open) element.showModal();
+      element.querySelector<HTMLInputElement>("#channel-search, #discovery-form input[name=query], #search-group-filter")?.focus();
     },
     update(change: (view: DialogView) => DialogView) {
       if (!current || !element.open) return;

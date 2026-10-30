@@ -175,3 +175,88 @@ test("expired saved sessions fail quietly and remain available for explicit sign
   await assert.rejects(adapter.connect(null,{interactive:false}),/Sign-in was not completed/);
   assert.equal(adapter.connected,false);assert.equal(adapter.connecting,false);assert.equal(disconnected,1);
 });
+
+test("concurrent resumed downloads share a reconnect and keep their offsets", async () => {
+  const notices = [], offsets = [];
+  const adapter = new TelegramAdapter({ notify: (...args) => notices.push(args) });
+  adapter.authorized = true;
+  let connects = 0;
+  adapter.client = {
+    connected: false,
+    async connect() { connects++; await new Promise(resolve => setTimeout(resolve, 10)); this.connected = true; },
+    getEntity: async () => ({}),
+    getMessages: async () => [{ document: { id: "doc", size: 524289 }, media: {} }],
+    async *iterDownload(_media, options) { offsets.push(Number(options.offset)); yield Buffer.from([42]); },
+  };
+  const item = { peer: { id: "1", type: "chat" }, id: "1", documentId: "doc", size: 524289 };
+  const consume = async () => {
+    const chunks = [];
+    for await (const chunk of adapter.download(item, 524288, new AbortController().signal)) chunks.push(chunk);
+    assert.deepEqual(Buffer.concat(chunks), Buffer.from([42]));
+  };
+  await Promise.all([consume(), consume()]);
+  assert.equal(connects, 1);
+  assert.deepEqual(offsets, [524288, 524288]);
+  assert.equal(notices[0][1].connected, false);
+  assert.equal(notices[0][1].restoringSession, true);
+  assert.equal(notices.at(-1)[1].connected, true);
+});
+
+test("a disconnected request clears stale status and reconnects on the next attempt", async () => {
+  const adapter = new TelegramAdapter({});
+  adapter.connected = adapter.authorized = true;
+  let connects = 0;
+  adapter.client = {
+    connected: true,
+    connect: async () => { connects++; },
+    getEntity: async () => { throw new Error("Cannot send requests while disconnected. Please reconnect."); },
+  };
+  const attempt = async () => {
+    for await (const chunk of adapter.download({peer:{id:'1',type:'chat'}}, 0, new AbortController().signal)) {}
+  };
+  await assert.rejects(attempt(), /disconnected/);
+  assert.equal(adapter.connected, false);
+  await assert.rejects(attempt(), /disconnected/);
+  assert.equal(connects, 1);
+});
+
+test("failed reconnects stay offline and can be retried without signing in", async () => {
+  const adapter = new TelegramAdapter({});
+  adapter.authorized = true;
+  adapter.client = { connected: false, connect: async () => { throw new Error('offline'); } };
+  await assert.rejects(adapter.downloadClient(), /network reconnect failed/);
+  assert.equal(adapter.connected, false);
+  assert.equal(adapter.reconnecting, null);
+  adapter.client.connect = async () => { adapter.client.connected = true; };
+  assert.equal(await adapter.downloadClient(), adapter.client);
+  assert.equal(adapter.connected, true);
+  await adapter.disconnect().catch(() => {});
+  assert.throws(() => adapter.requireClient(), /Connect your Telegram/);
+});
+
+test("Telegram transport events update status and old clients cannot change a new session", async () => {
+  const { UpdateConnectionState } = await import('teleproto/network/UpdateConnectionState.js');
+  const callbacks = [], notices = [];
+  const adapter = new TelegramAdapter({
+    loadCredentials: () => ({ apiId: 123, apiHash: 'a'.repeat(32) }),
+    saveCredentials() {}, notify: (...args) => notices.push(args),
+    createClient: () => ({
+      setLogLevel() {}, addEventHandler(callback) { callbacks.push(callback); },
+      start: async () => {}, checkAuthorization: async () => true,
+      session: { save: () => '' }, getMe: async () => ({}), disconnect: async () => {},
+    }),
+  });
+  await adapter.connect();
+  callbacks[0](new UpdateConnectionState(UpdateConnectionState.disconnected));
+  assert.equal(adapter.connected, false);
+  assert.equal(adapter.requireClient(), adapter.client, 'session is still authorised for resume');
+  callbacks[0](new UpdateConnectionState(UpdateConnectionState.connected));
+  assert.equal(adapter.connected, true);
+  await adapter.connect();
+  callbacks[0](new UpdateConnectionState(UpdateConnectionState.disconnected));
+  assert.equal(adapter.connected, true);
+  await adapter.disconnect();
+  callbacks[1](new UpdateConnectionState(UpdateConnectionState.connected));
+  assert.equal(adapter.connected, false);
+  assert.deepEqual(notices.map(([, data]) => data.connected), [false, true]);
+});

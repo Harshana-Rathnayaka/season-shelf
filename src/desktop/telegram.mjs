@@ -3,6 +3,7 @@ const { version: appVersion } = createRequire(import.meta.url)("../../package.js
 import { rangeSource } from "./range-source.mjs";
 import { TelegramClient, Api } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
+import { UpdateConnectionState } from "teleproto/network/UpdateConnectionState.js";
 import bigInt from "big-integer";
 import { parseEpisode } from "../core/catalog.mjs";
 
@@ -26,6 +27,8 @@ export class TelegramAdapter {
         !/^[a-f0-9]{32}$/i.test(auth.apiHash || "")
       )
         throw new Error("Enter your Telegram API ID and API hash");
+      this.authorized = false;
+      this.connected = false;
       await this.client?.disconnect();
       const session = saved?.apiId === Number(auth.apiId) ? saved.session : "";
       if (!interactive && !session) throw new Error("Sign in once to remember this account");
@@ -42,6 +45,11 @@ export class TelegramAdapter {
         },
       );
       this.client.setLogLevel("none");
+      const client = this.client;
+      client.addEventHandler?.(update => {
+        if (this.client !== client || !this.authorized || !(update instanceof UpdateConnectionState)) return;
+        this.connectionState(update.state === UpdateConnectionState.connected);
+      });
       if (!interactive) await this.client.connect();
       else await this.client.start({
         phoneNumber: async () =>
@@ -76,6 +84,8 @@ export class TelegramAdapter {
         apiHash: auth.apiHash,
         session: this.client.session.save(),
       });
+      this.authorized = true;
+      this.needsReconnect = false;
       this.connected = true;
       // Profile failure must not invalidate an otherwise authorised session.
       this.profile = null;
@@ -88,6 +98,7 @@ export class TelegramAdapter {
       } catch { /* Account details can be refreshed on the next connection. */ }
       return { connected: true, profile: this.profile };
     } catch (error) {
+      this.authorized = false;
       this.connected = false;
       this.profile = null;
       await this.client?.disconnect();
@@ -97,9 +108,34 @@ export class TelegramAdapter {
     }
   }
   requireClient() {
-    if (!this.connected || !this.client)
+    if ((!this.connected && !this.authorized) || !this.client)
       throw new Error("Connect your Telegram account first");
     return this.client;
+  }
+  connectionState(connected, restoringSession = false) {
+    this.connected = connected;
+    this.notify?.("connection", { connected, restoringSession, connectionError: "", profile: this.profile });
+  }
+  async downloadClient() {
+    const client = this.requireClient();
+    if (this.reconnecting) return this.reconnecting;
+    if (client.connected !== false && !this.needsReconnect) return client;
+    this.connectionState(false, true);
+    // Concurrent downloads share one reconnect, retaining the authorised session.
+    this.reconnecting = (async () => {
+      try {
+        await client.connect();
+        if (this.client !== client || (!this.authorized && !this.connected))
+          throw new Error("Connect your Telegram account first");
+        this.needsReconnect = false;
+        this.connectionState(true);
+        return client;
+      } catch (error) {
+        this.connectionState(false);
+        throw new Error(`Telegram network reconnect failed: ${error.message || error}`, { cause: error });
+      } finally { this.reconnecting = null; }
+    })();
+    return this.reconnecting;
   }
   input(peer) {
     return peer.type === "channel"
@@ -201,58 +237,70 @@ export class TelegramAdapter {
     }
   }
   async *download(item, offset, signal) {
-    const client = this.requireClient();
-    const input = this.input(item.peer);
-    const entity = await client.getEntity(input);
-    if (entity.noforwards)
-      throw new Error("This channel restricts saving content");
-    const [message] = await client.getMessages(input, {
-      ids: [Number(item.id)],
-    });
-    if (!message?.document || message.noforwards)
-      throw new Error("Attachment is no longer available for saving");
-    if (
-      String(message.document.id) !== item.documentId ||
-      Number(message.document.size) !== item.size
-    )
-      throw new Error("Source attachment changed; rescan the channel");
-    if (signal.aborted) return;
-    // Refill one bounded slot as each ordered chunk is consumed; no batch barrier.
-    const block = 524288, controller = new AbortController();
-    const combined = AbortSignal.any([signal,controller.signal]);
-    const pending = new Map();
-    const source=rangeSource(client,message.media);
-    const read = async start => {
-      await this.transferPolicy?.acquire(Math.min(block,item.size-start),combined);
-      combined.throwIfAborted();
-      if (Date.now() < (this.floodUntil || 0)) {
-        const error=new Error("FLOOD_WAIT: Telegram requested a pause");
-        error.seconds=Math.ceil((this.floodUntil-Date.now())/1000);throw error;
-      }
-      const data=await source.read(start,block,combined);
-      if(data.length!==Math.min(block,item.size-start)) throw new Error("Incomplete range received from Telegram");
-      return data;
-    };
-    let next=offset;
-    const fill=()=>{while(pending.size<source.window && next<item.size) {const start=next;next+=block;pending.set(start,read(start).then(data=>({data}),error=>({error})));}};
+    signal.throwIfAborted();
+    const client = await this.downloadClient();
+    signal.throwIfAborted();
     try {
-      fill();
-      for(let current=offset;current<item.size;current+=block) {
-        const result=await pending.get(current);pending.delete(current);
-        if(result.error) {
-          if(/FLOOD/i.test(result.error.message || '') && result.error.seconds) this.floodUntil=Date.now()+result.error.seconds*1000;
-          throw result.error;
-        }
+      const input = this.input(item.peer);
+      const entity = await client.getEntity(input);
+      if (entity.noforwards)
+        throw new Error("This channel restricts saving content");
+      const [message] = await client.getMessages(input, {
+        ids: [Number(item.id)],
+      });
+      if (!message?.document || message.noforwards)
+        throw new Error("Attachment is no longer available for saving");
+      if (
+        String(message.document.id) !== item.documentId ||
+        Number(message.document.size) !== item.size
+      )
+        throw new Error("Source attachment changed; rescan the channel");
+      if (signal.aborted) return;
+      // Refill one bounded slot as each ordered chunk is consumed; no batch barrier.
+      const block = 524288, controller = new AbortController();
+      const combined = AbortSignal.any([signal,controller.signal]);
+      const pending = new Map();
+      const source=rangeSource(client,message.media);
+      const read = async start => {
+        await this.transferPolicy?.acquire(Math.min(block,item.size-start),combined);
         combined.throwIfAborted();
-        // Refill before the consumer writes to disk so network and staging I/O overlap.
-        // Pending memory remains bounded by source.window plus the yielded chunk.
+        if (Date.now() < (this.floodUntil || 0)) {
+          const error=new Error("FLOOD_WAIT: Telegram requested a pause");
+          error.seconds=Math.ceil((this.floodUntil-Date.now())/1000);throw error;
+        }
+        const data=await source.read(start,block,combined);
+        if(data.length!==Math.min(block,item.size-start)) throw new Error("Incomplete range received from Telegram");
+        return data;
+      };
+      let next=offset;
+      const fill=()=>{while(pending.size<source.window && next<item.size) {const start=next;next+=block;pending.set(start,read(start).then(data=>({data}),error=>({error})));}};
+      try {
         fill();
-        yield result.data;
+        for(let current=offset;current<item.size;current+=block) {
+          const result=await pending.get(current);pending.delete(current);
+          if(result.error) {
+            if(/FLOOD/i.test(result.error.message || '') && result.error.seconds) this.floodUntil=Date.now()+result.error.seconds*1000;
+            throw result.error;
+          }
+          combined.throwIfAborted();
+          // Refill before the consumer writes to disk so network and staging I/O overlap.
+          // Pending memory remains bounded by source.window plus the yielded chunk.
+          fill();
+          yield result.data;
+        }
+      } finally { controller.abort();await Promise.allSettled(pending.values()); }
+    } catch (error) {
+      if (!signal.aborted && /disconnected|reconnect/i.test(error.message || "")) {
+        this.needsReconnect = true;
+        this.connectionState(false);
       }
-    } finally { controller.abort();await Promise.allSettled(pending.values()); }
+      throw error;
+    }
   }
 
   async disconnect() {
+    this.authorized = false;
+    this.needsReconnect = false;
     this.connected = false;
     this.profile = null;
     await this.client?.disconnect();

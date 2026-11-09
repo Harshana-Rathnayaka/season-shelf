@@ -15,8 +15,8 @@ export function createPresentation(getState: () => AppState, call: Call, toastEl
       ? colourScheme.matches ? "dark" : "light" : state.settings.theme || "dark";
     if (!state.customTitleBar || !window.shelf) return;
     const light = document.documentElement.dataset.theme === "light";
-    const color = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || (light ? "#f5f6f4" : "#101113");
-    const symbolColor = light ? "#202c27" : "#edf0ef";
+    const color = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || (light ? "#ffffff" : "#0d1117");
+    const symbolColor = light ? "#1f2328" : "#f0f6fc";
     const signature = color + symbolColor;
     if (signature === titleBarColours) return;
     titleBarColours = signature;

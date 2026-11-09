@@ -313,6 +313,18 @@ test("publish recognises an already verified destination after a restart", async
   const second = await publishFile(args);
   assert.equal(first, second);
 });
+test('publication refuses to overwrite or remove an existing temporary path', async t => {
+  const f = await fixture(t, { size: 1024 });
+  const source = path.join(f.dir, 'source');
+  await fs.writeFile(source, f.data);
+  const temporary = path.join(f.root.path, '.season-shelf-collision.transfer');
+  await fs.writeFile(temporary, 'unrelated data');
+  await assert.rejects(publishFile({ source, root:f.root, parts:['episode.mkv'],
+    id:'collision', expectedHash:await hashFile(source) }), { code:'EEXIST' });
+  assert.equal(await fs.readFile(temporary, 'utf8'), 'unrelated data');
+  await assert.rejects(fs.stat(path.join(f.root.path, 'episode.mkv')), { code:'ENOENT' });
+});
+
 test('failed transfer verification removes its temporary destination copy', async t => {
   const f=await fixture(t,{size:1024});
   const source=path.join(f.dir,'source');await fs.writeFile(source,f.data);

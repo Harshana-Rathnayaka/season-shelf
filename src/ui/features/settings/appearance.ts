@@ -7,10 +7,13 @@ export function applyAppearance(settings: Settings) {
   style.setProperty("--font-scale", String(appearance.size / 100));
   style.setProperty("--font-weight", String(appearance.weight));
   style.setProperty("--strong-weight", String(Math.min(700, appearance.weight + 150)));
-  for (const name of ["--accent", "--accent-ink", "--accent-soft", "--accent-border", "--row-selected", "--orbit", "--text"])
+  for (const name of ["--accent", "--accent-ink", "--accent-soft", "--accent-border", "--row-selected", "--orbit", "--text", "--primary", "--primary-hover", "--primary-ink"])
     style.removeProperty(name);
   if (appearance.accent) {
     style.setProperty("--accent", appearance.accent);
+    style.setProperty("--primary", appearance.accent);
+    style.setProperty("--primary-hover", appearance.accent);
+    style.setProperty("--primary-ink", contrastInk(appearance.accent));
     style.setProperty("--accent-ink", contrastInk(appearance.accent));
     style.setProperty("--accent-soft", appearance.accent + "16");
     style.setProperty("--accent-border", appearance.accent + "88");

@@ -1,7 +1,7 @@
 {
   "name": "season-shelf",
   "productName": "Season Shelf",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "A local desktop companion for organising episodic Telegram downloads.",
   "private": true,
   "type": "module",
@@ -40,7 +40,7 @@
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "electron": "44.3.0",
+    "electron": "44.10.2",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.28.2",
     "jsdom": "30.0.1",
@@ -110,5 +110,8 @@
     "type": "git",
     "url": "https://github.com/Harshana-Rathnayaka/season-shelf.git"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "minimatch@>=7 <11.0.1": "^11.0.1"
+  }
 }

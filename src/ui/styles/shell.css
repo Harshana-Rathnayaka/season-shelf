@@ -209,7 +209,7 @@
   background: var(--muted);
 }
 .connection i.online {
-  background: var(--accent);
+  background: var(--success);
 }
 .connection .icon {
   width: 14px;

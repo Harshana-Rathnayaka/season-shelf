@@ -358,8 +358,8 @@ app
       minHeight: 720,
       title: runtime.name,
       icon:path.join(__dirname,"assets/icon.ico"),
-      ...(process.platform === "win32" ? {titleBarStyle:"hidden",titleBarOverlay:{color:"#101113",symbolColor:"#edf0ef",height:32}} : {}),
-      backgroundColor: "#101113",
+      ...(process.platform === "win32" ? {titleBarStyle:"hidden",titleBarOverlay:{color:"#0d1117",symbolColor:"#f0f6fc",height:32}} : {}),
+      backgroundColor: "#0d1117",
       autoHideMenuBar: true,
       webPreferences: {
         preload: path.join(__dirname, "preload.cjs"),

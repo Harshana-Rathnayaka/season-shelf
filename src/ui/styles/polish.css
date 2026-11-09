@@ -1,25 +1,21 @@
 /* Final interaction and hierarchy layer. Feature styles remain responsible for layout. */
 :root {
-  --radius-sm: 7px;
-  --radius-md: 11px;
-  --radius-lg: 16px;
+  --radius-sm: 6px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
   --shadow-float: 0 18px 55px #05070852;
   --shadow-soft: 0 1px 2px #05070830, 0 8px 24px #05070812;
   --ease-out: cubic-bezier(.2, .8, .2, 1);
 }
 
 :root[data-theme="light"] {
-  --shadow-float: 0 16px 44px #30382a24;
-  --shadow-soft: 0 1px 2px #30382a0a, 0 6px 18px #30382a06;
+  --shadow-float: 0 16px 44px #1f232824;
+  --shadow-soft: 0 1px 2px #1f23280a, 0 6px 18px #1f232806;
 }
 
-:root[data-theme="light"] #dialog::backdrop { background: #30382a66; }
+#dialog::backdrop { background: var(--backdrop); }
 
-body {
-  background:
-    radial-gradient(900px 480px at 88% -12%, var(--accent-soft), transparent 68%),
-    var(--bg);
-}
+body { background: var(--bg); }
 
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -64,8 +60,8 @@ body {
 
 .button { min-height: 38px; border-radius: var(--radius-sm); transition: background .16s, border-color .16s, color .16s, box-shadow .16s, transform .16s var(--ease-out); }
 .button:hover:not(:disabled) { transform: translateY(-1px); }
-.button.primary { box-shadow: 0 5px 16px color-mix(in srgb, var(--accent) 20%, transparent); }
-.button.primary:hover:not(:disabled) { box-shadow: 0 7px 20px color-mix(in srgb, var(--accent) 28%, transparent); }
+.button.primary { box-shadow: none; }
+.button.primary:hover:not(:disabled) { box-shadow: none; }
 .button.secondary:hover:not(:disabled) { box-shadow: 0 4px 12px #05070818; }
 .text-button { border-radius: var(--radius-sm); }
 .text-button:hover:not(:disabled) { background: var(--accent-soft); }
@@ -183,3 +179,5 @@ dialog::backdrop { opacity: 1; transition: opacity .2s, display .2s allow-discre
   .control-tooltip { animation: none; }
   dialog { transition: none; }
 }
+
+.queue-item[data-status="failed"]::before { background: var(--danger); }

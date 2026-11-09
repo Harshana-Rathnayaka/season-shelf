@@ -74,7 +74,7 @@ export async function migrateDestinationRoots(store) {
 }
 export async function hashFile(filename) {
   const hash = createHash("sha256");
-  for await (const chunk of createReadStream(filename)) hash.update(chunk);
+  for await (const chunk of createReadStream(filename, { highWaterMark: 1024 * 1024 })) hash.update(chunk);
   return hash.digest("hex");
 }
 export async function publishFile({ source, root, parts, id, expectedHash }) {
@@ -97,8 +97,11 @@ export async function publishFile({ source, root, parts, id, expectedHash }) {
     path.dirname(final),
     `.season-shelf-${id}.transfer`,
   );
+  let ownsTemporary = false;
   try {
-    await fs.copyFile(source, temporary);
+    // Never overwrite an existing path: it may be a symlink or another transfer.
+    await fs.copyFile(source, temporary, constants.COPYFILE_EXCL);
+    ownsTemporary = true;
     if ((await hashFile(temporary)) !== expectedHash)
       throw new Error("Transfer verification failed; original retained");
     await checkRoot(root);
@@ -121,7 +124,7 @@ export async function publishFile({ source, root, parts, id, expectedHash }) {
     try {
       await checkRoot(root, 0, { requireSpace: false });
       const parent = await fs.realpath(path.dirname(temporary));
-      if (isWithin(root.path, parent, { allowRoot: true }))
+      if (ownsTemporary && isWithin(root.path, parent, { allowRoot: true }))
         await fs.rm(temporary, { force: true });
     } catch { /* A later queue removal can retry cleanup if the drive changed. */ }
   }

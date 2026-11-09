@@ -36,3 +36,13 @@ download history and series watches are upgraded in one database transaction;
 only then is a matching marker removed. Unavailable or changed destinations keep
 their original checks and retry migration on a subsequent startup. Lifetime
 usage counters and downloaded media are untouched by this migration.
+
+## November 2026 investigation
+
+The network path still uses 512 KiB requests, eight bounded requests per file through Teleproto's media scheduler (four on the fallback), ordered delivery, cancellation, shared bandwidth limiting and pipelined disk writes. The installed scheduler starts two media sessions and adapts its windows. Blindly increasing requests could increase memory, flood waits and contention; no live evidence justified changing those limits. Telegram documents constraints on request alignment and size: https://core.telegram.org/api/files.
+
+File verification previously used Node's default 64 KiB read stream buffer. It now uses 1 MiB, reducing stream chunks by 16 times while retaining full SHA-256 verification and bounded memory. This helps local finishing, which can backpressure the queue when destinations are slow. It does not change network bandwidth or remove integrity checks.
+
+Local Windows benchmark: a generated 256 MiB file, six sequential reads in alternating order, three samples per buffer size, identical SHA-256 hashes. 64 KiB samples: 1034, 901, 914 ms (median 914 ms); 1 MiB: 812, 777, 892 ms (median 812 ms). Median verification time decreased about 11%. These are warm-cache measurements on this machine, not a guarantee for other disks or Telegram transfer rates. Test data was deleted after measurement.
+
+Next useful measurement: download the same attachment with Season Shelf and Telegram Desktop sequentially on the same connection; record account tier, file size, elapsed receive time, checking/transferring time, bandwidth cap, concurrency and destination drive. Repeat at least three times. A separate throughput result is needed before tuning request windows or claiming higher network MB/s.

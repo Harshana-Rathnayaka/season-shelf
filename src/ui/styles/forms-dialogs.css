@@ -75,7 +75,7 @@ dialog {
   box-shadow: 0 24px 100px #0006;
 }
 dialog::backdrop {
-  background: #050708a8;
+  background: var(--backdrop);
   backdrop-filter: blur(5px);
 }
 dialog h2 {
@@ -206,8 +206,9 @@ dialog input {
   transform: translate(-50%, 0);
 }
 #toast.error {
-  background: #e7ab90;
-  color: #231910;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger-border);
 }
 .notice,
 .review-note {

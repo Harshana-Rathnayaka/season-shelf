@@ -243,6 +243,8 @@ test("appearance applies across pages and reset restores theme colours", async (
   form.elements.accent.value='#5533aa';
   form.elements.accent.dispatchEvent(new f.window.Event('input',{bubbles:true}));
   assert.equal(form.elements.autoAccent.checked,false);
+  assert.equal(f.document.documentElement.style.getPropertyValue('--primary'),'#5533aa');
+  assert.equal(f.document.documentElement.style.getPropertyValue('--primary-ink'),'#ffffff');
   assert.equal(f.document.documentElement.style.getPropertyValue('--accent'),'#5533aa');
   form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));
   await new Promise(resolve=>setTimeout(resolve,0));
@@ -255,6 +257,8 @@ test("appearance applies across pages and reset restores theme colours", async (
   await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(f.document.documentElement.style.getPropertyValue('--font-scale'),'1');
   assert.equal(f.document.documentElement.style.getPropertyValue('--accent'),'');
+  for (const name of ['--primary', '--primary-hover', '--primary-ink'])
+    assert.equal(f.document.documentElement.style.getPropertyValue(name),'');
 });
 
 test("discovery sends only a submitted query and continues after explicit result selection", async (t) => {

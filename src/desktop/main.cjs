@@ -21,6 +21,7 @@ let watcher,
   adapter,
   discovery,
   authPrompt,
+  shutdown,
   sleepBlocker,
   quitting = false;
 const uiFile = path.join(__dirname, "../../dist/ui/index.html");
@@ -66,29 +67,8 @@ app
       if (win && !win.isDestroyed())
         win.webContents.send("shelf:event", { type, data });
     };
-    const credentials = {
-      loadCredentials: () => {
-        const encrypted = store.get("credentials", null);
-        if (!encrypted) return null;
-        if (!safeStorage.isEncryptionAvailable())
-          throw new Error("OS credential encryption is unavailable");
-        return JSON.parse(
-          safeStorage.decryptString(Buffer.from(encrypted, "base64")),
-        );
-      },
-      saveCredentials: (value) => {
-        if (
-          !safeStorage.isEncryptionAvailable() ||
-          (process.platform === "linux" &&
-            safeStorage.getSelectedStorageBackend() === "basic_text")
-        )
-          throw new Error("Secure OS credential storage is unavailable");
-        store.set(
-          "credentials",
-          safeStorage.encryptString(JSON.stringify(value)).toString("base64"),
-        );
-      },
-    };
+    const {credentialStorage,hasSecureStorage} = require("./secure-storage.cjs");
+    const credentials = credentialStorage(store, safeStorage);
     adapter = new TelegramAdapter({
       ...credentials,
       notify,
@@ -168,11 +148,34 @@ app
       });
     }
     const confirmInApp=require("./confirmations.cjs").createConfirmations({handle,notify});
+    const {ShutdownWhenDone,requestWindowsShutdown}=await import("./shutdown.mjs");
+    let shutdownPhase='off';
+    shutdown=new ShutdownWhenDone({queue,execute:requestWindowsShutdown,
+      isBusy:()=>quitting || scanning || !!discovery.operation || !!authPrompt || adapter.connecting || watcher.checking,
+      notify:status=>{
+        const startingCountdown=status.phase==='countdown' && shutdownPhase!=='countdown';
+        shutdownPhase=status.phase;
+        notify('shutdown',status);
+        if(startingCountdown && Notification.isSupported()) {
+          const notice=new Notification({title:'Downloads finished',body:'Your computer will shut down in 60 seconds. Open Season Shelf to cancel.'});
+          notice.on('click',()=>{win?.show();win?.focus();});notice.show();
+        }
+      }});
+    queue.on('change',()=>shutdown.check());
+    handle('shutdown-set',({enabled})=>shutdown.setEnabled(enabled));
     const rememberedLogin=require("./login-memory.cjs").loginMemory(store,safeStorage);
     handle("login-suggestions",()=>rememberedLogin.list());
     handle("login-suggestion",({id})=>rememberedLogin.get(id));
     handle("forget-login-suggestions",()=>{rememberedLogin.forget();return {};});
     handle("licenses",async()=>JSON.parse(await fs.readFile(path.join(__dirname,"assets/licenses.json"),"utf8")));
+    const {activateAccountWorkspace} = await import("../core/account-workspace.mjs");
+    const activateWorkspace = adoptLegacy => {
+      shutdown.cancel();
+      const workspace = activateAccountWorkspace({store,queue,watcher,accountId:adapter.accountId,adoptLegacy});
+      channels = workspace.channels; catalogue = workspace.catalogue;
+      discovery.reset();
+      return workspace;
+    };
     let sessionRestore, connectionError = "";
     const {clearWorkspace,freshUsage}=await import("../core/reset.mjs");
     handle("clear-app-data",async()=>{
@@ -181,7 +184,8 @@ app
       const answer=await confirmInApp({type:"warning",title:"Clear app data?",message:"Clear download history and the current library?",detail:"Also removes unfinished download data, series watches and lifetime totals. Completed files stay on disk. Your Telegram login, preferences and completed guide are kept. Cleared history cannot be restored from the app.",buttons:["Keep data","Clear app data"],defaultId:0,cancelId:0});
       if(answer.response!==1) return {cleared:false};
       if(busy()) throw new Error("An operation started. Wait for it to finish and try again.");
-      const data=await clearWorkspace(queue,store,watcher);channels=[];catalogue=null;discovery.choices.clear();
+      shutdown.cancel();
+      const data=await clearWorkspace(queue,store,watcher);channels=[];catalogue=null;discovery.reset();
       return {cleared:true,...data};
     });
     handle("reset-activity",async()=>{
@@ -192,13 +196,14 @@ app
     handle("finish-onboarding", () => { store.set("onboardingComplete", true); return {}; });
     handle("bootstrap", () => {
       if (!adapter.connected && !adapter.connecting && store.get("credentials", null) && !sessionRestore) {
-        sessionRestore = adapter.connect(null, {interactive:false})
-          .catch(error => { connectionError = String(error.message || error).slice(0,200); })
+        sessionRestore = queue.recovery.then(() => adapter.connect(null, {interactive:false}))
+          .then(() => { const workspace = activateWorkspace(true); notify("connection", {connected:true,profile:adapter.profile,...workspace}); })
+          .catch(async error => { await adapter.disconnect(); connectionError = String(error.message || error).slice(0,200); })
           .finally(() => notify("connection", {connected:adapter.connected,restoringSession:false,connectionError,profile:adapter.profile}));
       }
       return {
         firstRun: !store.get("onboardingComplete", false),
-        settings, channels, catalogue, jobs:queue.snapshot(), usage:queue.usage,
+        settings, channels, catalogue, jobs:queue.snapshot(), usage:queue.usage, shutdown:shutdown.snapshot(),
         currentBatchId:queue.currentBatchId, connected:adapter.connected, profile:adapter.profile,
         restoringSession:!!adapter.connecting, connectionError,
         hasCredentials:!!store.get("credentials",null),version:app.getVersion(),appName:runtime.name,environment:runtime.environment,customTitleBar:process.platform === "win32",
@@ -206,22 +211,24 @@ app
     });
     handle("connect", async (payload) => {
       if (discovery.operation) throw new Error("Stop bot discovery first");
-      if (queue.running.size)
-        throw new Error("Pause current downloads before reconnecting");
-      if (!safeStorage.isEncryptionAvailable())
-        throw new Error("OS credential encryption is unavailable");
-      const result = await adapter.connect(
-        payload.apiId
-          ? {
-              apiId: Number(payload.apiId),
-              apiHash: String(payload.apiHash || ""),
-              phone: String(payload.phone || ""),
-            }
-          : null,
-      );
-      rememberedLogin.save({apiId:Number(payload.apiId),apiHash:String(payload.apiHash || ""),phone:String(payload.phone || "")});
-      connectionError = "";
-      return result;
+      if (scanning || watcher.checking || adapter.connecting || adapter.loggingOut || queue.recovering || queue.running.size || queue.removals.size || queue.namingLocks.size)
+        throw new Error("Pause downloads and wait for current operations before signing in");
+      if (!hasSecureStorage(safeStorage)) throw new Error("Secure OS credential storage is unavailable");
+      const explicit = payload.apiId !== undefined || payload.apiHash !== undefined || payload.phone !== undefined;
+      queue.batching = true;
+      try {
+        const result = await adapter.connect(explicit ? {
+          apiId: Number(payload.apiId), apiHash: String(payload.apiHash || ""), phone: String(payload.phone || ""),
+        } : null);
+        const workspace = activateWorkspace(!explicit);
+        if (explicit) rememberedLogin.save({apiId:Number(payload.apiId),apiHash:String(payload.apiHash || ""),phone:String(payload.phone || "")});
+        connectionError = "";
+        return {...result,...workspace};
+      } catch (error) {
+        await adapter.disconnect();
+        notify("connection", {connected:false,profile:null,hasCredentials:!!store.get("credentials",null),restoringSession:false});
+        throw error;
+      } finally { queue.batching = false; }
     });
     handle("auth-reply", ({ id, value, cancel }) => {
       if (!authPrompt || authPrompt.id !== id)
@@ -236,17 +243,23 @@ app
       if (process.platform === "win32") win.setTitleBarOverlay({color,symbolColor,height:32});
       return {};
     });
-    handle("discovery-search", ({query,sourceId}) => discovery.search(query,sourceId));
+    const useDiscovery = async operation => {
+      const result = await operation;
+      if (result.catalogue) { catalogue=result.catalogue; store.set("catalogue",catalogue); }
+      return result;
+    };
+    handle("discovery-search", ({query,sourceId}) => useDiscovery(discovery.search(query,sourceId)));
     handle("discovery-open-message", ({link}) => discovery.openMessageLink(link));
-    handle("discovery-follow", ({id}) => discovery.follow(id));
+    handle("discovery-follow", ({id}) => useDiscovery(discovery.follow(id)));
+    handle("discovery-collect", () => useDiscovery(discovery.collectDelivery(catalogue)));
     handle("watch-list",()=>watcher.watches);
     handle("watch-set",payload=>watcher.set(catalogue,payload,settings[`${payload.mode}Root`]));
     handle("watch-check",async()=>{await watcher.check();return watcher.watches;});
     handle("subscription-choices",()=>discovery.subscriptionChoices());
-    handle("complete-subscriptions",({ids})=>discovery.completeSubscriptions(ids));
+    handle("complete-subscriptions",({ids})=>useDiscovery(discovery.completeSubscriptions(ids)));
     handle("find-missing",async ({mode})=>{
       if(!catalogue || !["archive","watch"].includes(mode)) throw new Error("Choose a series first");
-      for(const job of queue.jobs.filter(job=>job.status==="complete" && String(job.item.peer?.id)===String(catalogue.channel.id) && job.mode===mode)) {
+      for(const job of queue.jobs.filter(job=>job.status==="complete" && String(job.item.collectionId ?? job.item.peer?.id)===String(catalogue.channel.id) && job.mode===mode)) {
         try {await fs.access(job.finalPath);} catch(error) {if(error.code==="ENOENT") job.status="missing";else throw error;}
       }
       queue.save();return queue.snapshot();
@@ -265,6 +278,11 @@ app
     });
     handle("scan", async ({ id }) => {
       if (scanning) throw new Error("A channel scan is already running");
+      if(catalogue?.source==='bot' && catalogue.channel.id===id) {
+        scanning=true;
+        try {catalogue=await adapter.refreshDelivery(catalogue);store.set("catalogue",catalogue);return catalogue;}
+        finally {scanning=false;}
+      }
       const channel = channels.find((c) => c.id === id);
       if (!channel) throw new Error("Select a channel from your account");
       scanning = true;
@@ -343,12 +361,12 @@ app
     registerDownloadHandlers({handle, queue, adapter, shell, confirmInApp});
     handle("disconnect", async () => {
       if (discovery.operation) throw new Error("Stop bot discovery first");
-      if (queue.running.size)
-        throw new Error("Pause downloads and wait for them to stop first");
-      await adapter.disconnect();
-      store.set("credentials", null);
+      if (scanning || watcher.checking || adapter.connecting || adapter.loggingOut || queue.running.size || queue.removals.size || queue.namingLocks.size)
+        throw new Error("Pause downloads and wait for current operations before signing out");
+      shutdown.cancel();
+      const result = await adapter.logout();
       connectionError = "";
-      return { connected: false };
+      return { connected: false, ...result };
     });
     Menu.setApplicationMenu(null);
     win = new BrowserWindow({
@@ -395,6 +413,7 @@ app.on("before-quit", (event) => {
   if (quitting) return;
   event.preventDefault();
   quitting = true;
+  shutdown?.cancel();
   authPrompt?.reject(new Error("App closing"));
   discovery?.cancel();
   watcher?.stop();

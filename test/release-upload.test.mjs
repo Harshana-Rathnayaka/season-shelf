@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {uploadAsset} from '../scripts/upload-release.mjs';
+import {uploadAsset,releaseAssets} from '../scripts/upload-release.mjs';
+import {releasePlan} from '../scripts/release-plan.mjs';
+
+test('release uploads exclude diagnostics, credentials and unexpected archives',()=>{
+  const plan=releasePlan('v1.2.8','1.2.8');
+  const optional='Season-Shelf-1.2.8-mac-universal.zip.blockmap';
+  assert.deepEqual(releaseAssets([...plan.assets,optional,'builder-debug.yml','credentials.zip','session.zip','unrelated.exe'],plan),[...plan.assets,optional]);
+});
 
 test('release upload retries the same asset and replaces incomplete uploads', async () => {
   const calls = [], waits = [];

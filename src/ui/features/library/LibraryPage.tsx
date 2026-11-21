@@ -30,11 +30,12 @@ export function LibraryPage({ state, hasDesktop, onAction }: Props) {
         <p>{state.catalogue ? <>{state.catalogue.scanned || 0} messages checked <span>·</span> {verified} verified <span>·</span> {needsReview} need review{state.demo && <> <span>·</span> Illustrative sample</>}</> : "Select a Telegram channel to find its episodes"}</p>
       </div></div><div className="row-actions">
         <LibraryButton label="Change series" glyph="folder" command={{ action: "choose-series" }} onAction={onAction} />
-        <LibraryButton label="Rescan channel" glyph="refresh" iconOnly command={{ action: "rescan" }} onAction={onAction} disabled={state.busy || !state.catalogue} />
+        <LibraryButton label={state.catalogue?.source === "bot" ? "Refresh delivered files" : "Rescan channel"} glyph="refresh" iconOnly command={{ action: "rescan" }} onAction={onAction} disabled={state.busy || !state.catalogue} />
       </div></div>
       {state.busy && <div className="notice" role="status" id="scan-status">{state.scanProgress ? `Scanning… ${state.scanProgress.scanned} messages checked · ${state.scanProgress.found} episode files found` : "Scanning channel metadata…"}</div>}
       {state.demo && <div className="sample-note"><Icon name="info" /> Sample data lets you explore the interface. No files are downloaded.{hasDesktop && <LibraryButton label="Exit preview" command={{ action: "exit-demo" }} onAction={onAction} />}</div>}
-      {state.catalogue?.truncated && <div className="notice">Scan limited to 10,000 messages. Earlier episodes may not be included.</div>}
+      {state.catalogue?.sourceWarning && <div className="review-note" role="status">{state.catalogue.sourceWarning}{state.catalogue.source === "bot" && <LibraryButton label="Check delivery again" className="text-button" command={{ action:"collect-delivery" }} onAction={onAction} disabled={state.busy} />}</div>}
+      {state.catalogue?.truncated && <div className="notice">{state.catalogue.source === "bot" ? "Delivery collection reached its message limit. Some episodes may not be included; request a smaller batch." : "Scan limited to 10,000 messages. Earlier episodes may not be included."}</div>}
       {state.catalogue ? <>
         <div className="library-controls">
           <div className="quality-area"><QualityPicker state={state} onAction={onAction} /></div>

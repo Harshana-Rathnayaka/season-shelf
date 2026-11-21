@@ -1,3 +1,5 @@
+import { telegramContent } from './telegram-content.mjs';
+
 // Deliberately supports only discovery links, not arbitrary Telegram actions.
 // Parsing does not authorise a join, send a message, or prove an entity is a bot.
 export function parseDiscoveryLink(input) {
@@ -43,10 +45,9 @@ export function parseDiscoveryLink(input) {
 }
 
 export function discoveryLinks(message) {
-  const text = String(message.message || "").slice(0, 65536);
+  const {text,buttons,urls}=telegramContent(message);
   const candidates = [];
-  for (const row of (message.replyMarkup?.rows || []).slice(0,100))
-    for (const button of (row.buttons || []).slice(0,100)) {
+    for (const button of buttons) {
       // Layer 229 nests action fields inside KeyboardInlineButton.type.
       // Retain legacy support for cached messages and older schemas.
       const action = button.type || button;
@@ -56,6 +57,7 @@ export function discoveryLinks(message) {
         candidates.push({label:String(button.text || "Bot result"),target:{kind:"callback",data:Array.from(action.data)}});
       else candidates.push({label:String(button.text || "Telegram button"),target:{kind:"unsupported",buttonType:action.className || "Unknown"}});
     }
+  candidates.push(...urls);
   for (const entity of (message.entities || []).slice(0,200)) {
     if (entity.className === "MessageEntityTextUrl") candidates.push({label:text.slice(entity.offset,entity.offset + entity.length),url:entity.url});
     if (entity.className === "MessageEntityUrl") {
@@ -71,7 +73,7 @@ export function discoveryLinks(message) {
     const key = JSON.stringify(target) + (target?.kind === "unsupported" ? candidate.label : "");
     if (!target || seen.has(key)) return [];
     seen.add(key);
-    const navigation = /^(?:[\s\p{P}\p{S}]*\d+\s*\/\s*\d+[\s\p{P}\p{S}]*|[\s\p{P}\p{S}]*)$/u.test(candidate.label) || /\b(next|previous|prev|back|page|subscribe|subscription|verify|request|join|joined)\b/i.test(candidate.label);
+    const navigation = /^(?:[\s\p{P}\p{S}]*\d+\s*\/\s*\d+[\s\p{P}\p{S}]*|[\s\p{P}\p{S}]*)$/u.test(candidate.label) || /\b(next|previous|prev|back|page|subscribe|subscription|verify|request|join|joined|season)\b|\b(?:480|720|1080|2160)p\b|ආපසු|ඊළඟ/i.test(candidate.label);
     const ancillary = target.kind === "public-peer" && /(?:_chat$|^MovieClubFamily$)/i.test(target.username);
     return [{label:candidate.label.slice(0,200),target,automatic:target.kind !== "unsupported" && !navigation && !ancillary}];
   });

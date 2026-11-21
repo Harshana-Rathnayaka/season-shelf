@@ -42,6 +42,12 @@ const presentation = createPresentation(() => state, call, toastElement);
 const {toast, applyTheme} = presentation;
 const discovery = createDiscovery({call,dialogs,onJoined:async joined => {
   state.demo=false;state.channels=joined.channels;await scan(joined.channel.id);
+},onCatalogue:catalogue=>{
+  state.demo=false;state.catalogue=catalogue;state.selected.clear();state.query="";state.quality={};
+  state.libraryTab=catalogue.items.some(item=>!item.reason)?"verified":"unverified";
+  state.season=catalogue.items.find(item=>item.season!=null)?.season || 1;
+  state.page="library";state.busy=false;render();
+  toast(`${catalogue.items.length} bot-delivered files loaded. Select episodes to download.`);
 }});
 let unsubscribe: (() => void) | undefined;
 window.addEventListener("pagehide", () => {
@@ -125,8 +131,19 @@ async function connect(payload: {apiId?:string;apiHash?:string;phone?:string}) {
   dialogs.show({kind:"message",title:"Connecting...",message:"Keep this window open. Telegram may ask for a login code or your two-step verification password."});
   const result = await call("connect", payload);
   state.connected = result.connected;
+  state.restoringSession = false;
   state.profile = result.profile;
+  if (result.jobs) state.jobs = result.jobs;
+  if (result.usage) state.usage = result.usage;
+  if (result.currentBatchId) state.currentBatchId = result.currentBatchId;
+  if (result.catalogue !== undefined) state.catalogue = result.catalogue;
+  state.selected.clear();
+  state.query = "";
+  state.quality = {};
+  liveSnapshot = undefined;
   state.hasCredentials = true;
+  state.channels = result.channels || [];
+  render();
   state.channels = await call("channels");
   dialogs.close();
   render();
@@ -256,6 +273,8 @@ async function dispatchAction(action: string, data: DialogActionData & {page?: P
       await discovery.run("discovery-join",{id:required(data.choice)});
     } else if (action === "scan-channel") await scan(required(data.channel));
     else if (action === "rescan") {if(state.catalogue)await scan(state.catalogue.channel.id);}
+    else if (action === "collect-delivery") await discovery.run("discovery-collect");
+    else if (action === "cancel-shutdown") {state.shutdown=await call("shutdown-set",{enabled:false});render();}
     else if (action === "demo") startDemo();
     else if (action === "exit-demo") {
       state.demo = false;
@@ -265,6 +284,8 @@ async function dispatchAction(action: string, data: DialogActionData & {page?: P
       );
       state.selected.clear();
       render();
+    } else if (action === "dialog-back") {
+      dialogs.back();
     } else if (action === "close-dialog") {
       await closeActiveDialog();
     } else if (action === "folder") {
@@ -310,13 +331,14 @@ async function dispatchAction(action: string, data: DialogActionData & {page?: P
       state.selected.clear();
       render();
     } else if (action === "disconnect") {
-      await call("disconnect");
+      const result = await call("disconnect");
       state.profile = null;
       state.connected = false;
       state.hasCredentials = false;
       render();
       toast(
-        "Local session forgotten. You can also revoke it in Telegram → Devices.",
+        result.revoked ? "Signed out of Telegram. Local session forgotten."
+          : "Local session forgotten. Telegram could not confirm revocation; revoke it in Telegram → Devices.",
       );
     } else if (action === "show-guide") { showGuide();
     } else if (action === "clear-app-data") {
@@ -353,6 +375,7 @@ if (window.shelf) {
     if(type === "confirmation") {
       dialogs.show({kind:"confirmation",...data});
     } else if(type === "new-episodes") toast(`${data.count} new files in ${data.title}${data.automatic ? " queued." : ". Rescan the channel to view them."}`);
+    else if(type === "shutdown") {state.shutdown=data;render();}
     else if(type === "updates") {Object.assign(state,reduceBackgroundEvent(state,{type,data}));if(state.page==="settings") render();if(data.state==="ready"){updatePrompt();if(!$("#update-error"))toast("Update ready. Open Settings to restart and install.");}}
     else if (type === "connection") {
       Object.assign(state,reduceBackgroundEvent(state,{type,data}));

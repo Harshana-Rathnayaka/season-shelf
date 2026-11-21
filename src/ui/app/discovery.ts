@@ -3,9 +3,10 @@ import type { DiscoveryRequests, DiscoveryResult, JoinedChannel } from "../featu
 import type { DiscoverySource } from "../features/discovery/dialog-types";
 import type { Call } from "./ipc";
 import type { createDialogs } from "./dialogs";
+import type { LibraryCatalogue } from "../features/library/types";
 
-interface Context { call: Call; dialogs: ReturnType<typeof createDialogs>; onJoined: (joined: JoinedChannel) => Promise<void> }
-export function createDiscovery({ call, dialogs, onJoined }: Context) {
+interface Context { call: Call; dialogs: ReturnType<typeof createDialogs>; onJoined: (joined: JoinedChannel) => Promise<void>; onCatalogue: (catalogue:LibraryCatalogue) => void }
+export function createDiscovery({ call, dialogs, onJoined, onCatalogue }: Context) {
   let version = 0, busy = false;
   function showSearch(source: DiscoverySource | null = null) { dialogs.show({ kind: "discovery-search", source }); }
   return {
@@ -14,7 +15,7 @@ export function createDiscovery({ call, dialogs, onJoined }: Context) {
     async run(method: keyof DiscoveryRequests, payload?: DiscoveryRequests[keyof DiscoveryRequests]) {
       const current = ++version;
       busy = true;
-      const reading = method === "discovery-source" || method === "discovery-open-message";
+      const reading = method === "discovery-source" || method === "discovery-open-message" || method === "discovery-collect";
       dialogs.show({ kind: "discovery-wait", reading });
       try {
         let result: DiscoveryResult | null;
@@ -26,12 +27,15 @@ export function createDiscovery({ call, dialogs, onJoined }: Context) {
           onStage(stage) {
             if (current !== version) return;
             const heading = stage === "discovery-join" ? "Joining series channel..."
+              : stage === "discovery-collect" ? "Collecting delivered episodes..."
               : stage === "discovery-follow" ? "Opening series result..."
                 : reading ? "Checking Telegram..." : "Waiting for bot replies...";
             dialogs.update(view => view.kind === "discovery-wait" ? { ...view, heading } : view);
           },
         });
         if (!result || current !== version) return;
+        if (result.expired) return dialogs.show({kind:"discovery-expired",notice:result.notice});
+        if (result.catalogue) { dialogs.close(); return onCatalogue(result.catalogue); }
         if (result.joined) return await onJoined(result.joined);
         if (result.groups) return dialogs.show({ kind: "discovery-groups", groups: result.groups });
         if (result.source) return showSearch(result.source);

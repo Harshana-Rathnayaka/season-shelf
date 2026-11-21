@@ -162,7 +162,7 @@ test("saved sessions reconnect without interactive prompts", async () => {
   let connected=0,saved;
   const adapter=new TelegramAdapter({loadCredentials:()=>({apiId:123,apiHash:"a".repeat(32),session}),saveCredentials:value=>saved=value,
     ask:()=>{throw new Error("Must not prompt");},notify(){},
-    createClient:()=>({setLogLevel(){},connect:async()=>{connected++;},start:async()=>{throw new Error("Must not start interactive login");},getMe:async()=>({firstName:"Test",lastName:"Viewer",username:"viewer",phone:"private",id:"private"}),checkAuthorization:async()=>true,session:{save:()=>session},disconnect:async()=>{}})});
+    createClient:()=>({setLogLevel(){},connect:async()=>{connected++;},start:async()=>{throw new Error("Must not start interactive login");},getMe:async()=>({firstName:"Test",lastName:"Viewer",username:"viewer",phone:"private",id:1}),checkAuthorization:async()=>true,session:{save:()=>session},disconnect:async()=>{}})});
   assert.deepEqual(await adapter.connect(null,{interactive:false}),{connected:true,profile:{name:"Test Viewer",username:"viewer"}});
   assert.equal(connected,1);assert.equal(saved.session,session);
   assert.equal(adapter.connecting,false);
@@ -243,7 +243,7 @@ test("Telegram transport events update status and old clients cannot change a ne
     createClient: () => ({
       setLogLevel() {}, addEventHandler(callback) { callbacks.push(callback); },
       start: async () => {}, checkAuthorization: async () => true,
-      session: { save: () => '' }, getMe: async () => ({}), disconnect: async () => {},
+      session: { save: () => '' }, getMe: async () => ({id:1}), disconnect: async () => {},
     }),
   });
   await adapter.connect();

@@ -48,6 +48,10 @@ export async function orphanedPartials(queue) {
   try { entries = await fs.readdir(queue.staging); }
   catch (error) { if (error.code === "ENOENT") return []; throw error; }
   const known = new Set(queue.jobs.map(job => job.id));
+  // Switching accounts archives queue metadata; those partials are still owned.
+  for (const account of queue.store?.get('accountWorkspaceIndex', []) || [])
+    for (const job of queue.store.get(`accountWorkspace:${account}`, {jobs:[]}).jobs)
+      known.add(job.id);
   const files = [];
   for (const name of entries) {
     if (!/^[0-9a-f-]{36}\.part$/i.test(name)) continue;

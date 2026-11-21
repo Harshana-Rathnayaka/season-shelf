@@ -15,9 +15,15 @@ export interface LibraryItem {
   bitDepth?: number | null;
   alternatives?: number;
   unverified?: boolean;
+  collectionId?: string;
+}
+export interface LibraryCatalogue {
+  channel: { id: string; title: string }; items: LibraryItem[]; truncated?: boolean; scanned?: number;
+  source?: "bot"; sourceWarning?: string;
+  delivery?: { bot: string; expected?: number | null; received: number; complete: boolean };
 }
 export interface LibraryState {
-  catalogue: { channel: { id: string; title: string }; items: LibraryItem[]; truncated?: boolean; scanned?: number } | null;
+  catalogue: LibraryCatalogue | null;
   mode: DestinationMode;
   quality: Partial<QualitySelection>;
   libraryTab: LibraryTab;
@@ -39,5 +45,5 @@ export type LibraryCommand =
   | { action: "select-item"; id: string; selected: boolean }
   | { action: "select-all"; selected: boolean }
   | { action: "folder"; mode: DestinationMode }
-  | { action: "select-season" | "choose-series" | "rescan" | "exit-demo" | "watch-series" | "find-missing" | "download" | "connect" | "demo" };
+  | { action: "select-season" | "choose-series" | "rescan" | "collect-delivery" | "exit-demo" | "watch-series" | "find-missing" | "download" | "connect" | "demo" };
 export type LibraryActionHandler = (command: LibraryCommand) => Promise<void>;

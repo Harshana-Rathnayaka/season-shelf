@@ -15,6 +15,11 @@ export async function uploadAsset(tag, file, run, wait = delay) {
   }
 }
 
+export function releaseAssets(files, plan) {
+  const allowed = new Set([...plan.assets, ...plan.assets.filter(name => /\.(dmg|zip)$/.test(name)).map(name => `${name}.blockmap`)]);
+  return files.filter(name => allowed.has(name));
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const tag = process.env.GITHUB_REF_NAME;
   const {version} = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -22,7 +27,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const run = args => spawnSync('gh', args, {stdio:'inherit', timeout:300000});
   const view = spawnSync('gh', ['release', 'view', tag, '--json', 'isDraft'], {encoding:'utf8', timeout:30000});
   if (view.status !== 0 || !JSON.parse(view.stdout).isDraft) throw new Error('Uploads require an unpublished draft');
-  const files = fs.readdirSync('release').filter(name => /\.(exe|dmg|zip|blockmap|yml)$/.test(name));
+  // Publish only planned deliverables, never builder diagnostics or arbitrary files.
+  const files = releaseAssets(fs.readdirSync('release'), plan);
   const required = plan.assets.filter(name => process.platform === 'win32' ? !name.includes('-mac') : !name.includes('Setup') && name !== 'latest.yml');
   for (const name of required) if (!files.includes(name)) throw new Error(`Missing local asset: ${name}`);
   // Upload sequentially so a large ZIP failure retries only that asset.

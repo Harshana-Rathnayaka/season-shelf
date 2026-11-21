@@ -13,3 +13,12 @@ credentials*
 
 .build-cache/
 dist/
+
+# Local authentication exports and signing material must never be committed.
+*.db
+*.pem
+*.key
+*.p12
+*.pfx
+sessions/
+tdata/

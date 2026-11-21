@@ -1,7 +1,7 @@
 export function missingEpisodes(items, jobs, channelId, mode) {
   const covered = new Set();
   for (const job of jobs) {
-    if (job.status !== 'complete' || job.mode !== mode || String(job.item.peer?.id) !== String(channelId) || job.item.unverified) continue;
+    if (job.status !== 'complete' || job.mode !== mode || String(job.item.collectionId ?? job.item.peer?.id) !== String(channelId) || job.item.unverified) continue;
     for (let n=job.item.episode;n<=(job.item.episodeEnd ?? job.item.episode);n++) covered.add(`${job.item.season}:${n}`);
   }
   return items.filter(item=>{

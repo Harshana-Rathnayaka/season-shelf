@@ -8,6 +8,7 @@ import { DownloadActions } from "./components/DownloadActions";
 import { DownloadTabs } from "./components/DownloadTabs";
 import { ActionButton } from "../../shared/ui/ActionButton";
 import { Icon } from "../../shared/ui/Icon";
+import {ShutdownOption} from './components/ShutdownOption';
 
 interface Props { state: DownloadsState; onAction: DownloadActionHandler; onBrowse: () => void }
 
@@ -28,6 +29,7 @@ export function DownloadsPage({ state, onAction, onBrowse }: Props) {
       </>}</div>
     </div>
     <DownloadActions jobs={jobs} finished={finished} onAction={onAction} />
+    {!finished && <ShutdownOption state={state} onAction={onAction} />}
     <section key={state.downloadTab} id="downloads-panel" className="catalogue-panel queue-panel workspace-scroll" tabIndex={0} role="tabpanel" aria-labelledby={`downloads-tab-${state.downloadTab}`} aria-label={finished ? "Finished downloads" : "Ongoing downloads"}>
       {jobs.length ? jobs.map(job => <DownloadRow key={job.id} job={job} onAction={onAction} />) : <div className="empty-state">
         <div className="empty-symbol"><Icon name={finished ? "folder" : "download"} /></div>

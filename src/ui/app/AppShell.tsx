@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from "react";
 import { Icon } from "../shared/ui/Icon";
+import {AsyncActionButton} from '../shared/ui/AsyncActionButton';
+import type {ShutdownStatus} from '../features/downloads/types';
 
 export type Page = "library" | "queue" | "settings" | "help";
-export type ShellCommand = { action: "nav"; page: Page } | { action: "theme" | "connect" | "disconnect" | "toggle-sidebar" };
+export type ShellCommand = { action: "nav"; page: Page } | { action: "theme" | "connect" | "disconnect" | "toggle-sidebar" | "cancel-shutdown" };
 export type ShellActionHandler = (command: ShellCommand) => Promise<void>;
 export interface ShellState {
   page: Page;
@@ -14,6 +16,7 @@ export interface ShellState {
   restoringSession?: boolean;
   demo: boolean;
   profile?: { name?: string; username?: string } | null;
+  shutdown?:ShutdownStatus;
 }
 const labels: Record<Page, string> = { library: "Series library", queue: "Downloads", settings: "Settings", help: "How it works" };
 
@@ -71,6 +74,10 @@ export function AppShell({ state, count, children, onAction }: { state: ShellSta
           <button className="connection" data-action="connect" onClick={() => void onAction({ action: "connect" })}><i className={state.connected ? "online" : ""} />{state.connected ? "Connected" : state.restoringSession ? "Reconnecting..." : "Connect Telegram"}<Icon name="arrow" /></button>
         </div>
       </header>
+      {state.shutdown && ['countdown','error','requested'].includes(state.shutdown.phase) && <section className="shutdown-banner" role="region" aria-label="Automatic shutdown">
+        <p>{state.shutdown.phase==='countdown' ? <>Downloads are saved. Shutting down in <strong>{state.shutdown.remainingSeconds} seconds</strong>.</> : state.shutdown.message}</p>
+        {state.shutdown.phase!=='requested' && <AsyncActionButton label={state.shutdown.phase==='countdown'?'Cancel shutdown':'Dismiss'} className="button secondary" data-action="cancel-shutdown" onAction={()=>onAction({action:'cancel-shutdown'})} />}
+      </section>}
       {children}
       <footer className="app-footer"><span><Icon name="shield" /> Local by design. Yours to control.</span><span>{name} <b>{state.version || "0.1"}</b></span></footer>
     </div>

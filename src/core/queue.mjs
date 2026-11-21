@@ -61,7 +61,7 @@ export class DownloadQueue extends EventEmitter {
     if (!["archive", "watch"].includes(mode))
       throw new Error("Unknown download mode");
     await checkRoot(root);
-    if (items.some(item => this.namingLocks.has(`${root.id}:${item.peer?.id}:${mode}:${item.season}`)))
+    if (items.some(item => this.namingLocks.has(`${root.id}:${item.collectionId ?? item.peer?.id}:${mode}:${item.season}`)))
       throw new Error("Season filenames are finishing; try adding files again shortly");
     const added = [];
     const batchId = this.workBatch();
@@ -73,7 +73,7 @@ export class DownloadQueue extends EventEmitter {
         item.size <= 0
       )
         throw new Error("Invalid attachment");
-      const key = `${item.peer.id}:${item.id}:${mode}:${root.id}`;
+      const key = `${item.peer.type === 'user' ? 'user:' : ''}${item.peer.id}:${item.id}:${mode}:${root.id}`;
       let existing = this.jobs.find(
         (job) =>
           job.key === key &&
@@ -128,7 +128,7 @@ export class DownloadQueue extends EventEmitter {
   workBatch() {
     return this.jobs.find(job => !["complete", "cancelled", "deleted", "missing"].includes(job.status))?.batchId || randomUUID();
   }
-  seasonKey(job) { return `${job.root.id}:${job.item.peer.id}:${job.mode}:${job.item.season}`; }
+  seasonKey(job) { return `${job.root.id}:${job.item.collectionId ?? job.item.peer.id}:${job.mode}:${job.item.season}`; }
   async recoverNaming() {
     for (const job of this.jobs.filter(job => job.renamePending)) {
       try { await finishRename(job, () => this.save()); }

@@ -1,12 +1,13 @@
 const {randomUUID} = require('node:crypto');
-exports.loginMemory = (store,safeStorage) => {
+const {hasSecureStorage} = require('./secure-storage.cjs');
+exports.loginMemory = (store,safeStorage,platform = process.platform) => {
   const read=()=>{
     const value=store.get('loginSuggestions',null);
-    if(!value || !safeStorage.isEncryptionAvailable()) return [];
+    if(!value || !hasSecureStorage(safeStorage,platform)) return [];
     try{return JSON.parse(safeStorage.decryptString(Buffer.from(value,'base64')));}catch{return [];}
   };
   const write=entries=>{
-    if(!safeStorage.isEncryptionAvailable()) return;
+    if(!hasSecureStorage(safeStorage,platform)) return;
     store.set('loginSuggestions',safeStorage.encryptString(JSON.stringify(entries)).toString('base64'));
   };
   return {

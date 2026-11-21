@@ -12,6 +12,10 @@ interface Context {
 
 export async function handleDownloadCommand(command: DownloadCommand, { state, call, render, toast, showFileDetails, closeDialog }: Context): Promise<void> {
   switch (command.action) {
+    case "shutdown-toggle":
+      if(state.demo){toast("Automatic shutdown is available in the desktop app.");return;}
+      state.shutdown=await call("shutdown-set",{enabled:command.enabled});
+      break;
     case "download-tab":
       state.downloadTab = command.tab;
       render();

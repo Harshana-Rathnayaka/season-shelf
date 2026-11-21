@@ -1,7 +1,7 @@
 {
   "name": "season-shelf",
   "productName": "Season Shelf",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "A local desktop companion for organising episodic Telegram downloads.",
   "private": true,
   "type": "module",
@@ -57,7 +57,11 @@
       "src/**/*",
       "package.json",
       "LICENSE",
-      "dist/ui/**/*"
+      "dist/ui/**/*",
+      "!**/.env",
+      "!**/.env.*",
+      "!**/*.{session,session-journal,sqlite,sqlite-shm,sqlite-wal,db,pem,key,p12,pfx}",
+      "!**/credentials*"
     ],
     "win": {
       "target": "nsis",

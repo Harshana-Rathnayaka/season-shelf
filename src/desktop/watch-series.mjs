@@ -7,6 +7,7 @@ export class SeriesWatcher {
     this.timer=setInterval(()=>this.check().catch(error=>{this.lastError=error.message;}),60*60*1000);this.timer.unref();
   }
   set(catalogue,{mode,quality,automatic},root) {
+    if(catalogue?.source==='bot') throw new Error('Bot deliveries are temporary. Request the next season or episodes from the bot instead of watching this chat.');
     if(!catalogue || !['archive','watch'].includes(mode) || ![true,false,null].includes(automatic)) throw new Error('Choose a series and watch mode');
     selectEpisodes(catalogue.items,mode,quality);
     if(automatic && !root) throw new Error("Choose a download folder first");

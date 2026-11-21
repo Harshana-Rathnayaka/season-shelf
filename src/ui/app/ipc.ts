@@ -5,16 +5,18 @@ import type { Settings } from "../features/settings/types";
 import type { DestinationMode, QualitySelection } from "../features/library/types";
 
 const maybeText = optional(text), maybeNumber = optional(number), maybeBoolean = optional(boolean);
-const channel = object({ id: text, title: text });
+const shutdown=object({available:boolean,enabled:boolean,phase:oneOf("off","waiting","countdown","requested","error"),remainingSeconds:number,message:text});
+const channel = object({ id: text, title: text, source:optional(oneOf("bot")) });
 const peer = object({ id: text, type: maybeText });
 const item = object({ id: maybeText, filename: text, size: number, title: maybeText,
   season: optional(nullable(number)), episode: optional(nullable(number)), episodeEnd: optional(nullable(number)),
   resolution: optional(nullable(number)), codec: optional(nullable(text)), reason: optional(nullable(text)),
-  bitDepth: optional(nullable(number)), unverified: maybeBoolean, alternatives: maybeNumber, peer: optional(peer) });
+  bitDepth: optional(nullable(number)), unverified: maybeBoolean, alternatives: maybeNumber, peer: optional(peer), collectionId: maybeText });
 const catalogue = object({ channel, items: array({ parse(value: unknown) {
   const parsed = item.parse(value);
   return { ...parsed, id: text.parse(parsed.id) };
-} }), truncated: maybeBoolean, scanned: maybeNumber });
+} }), truncated: maybeBoolean, scanned: maybeNumber, source: optional(oneOf("bot")), sourceWarning: maybeText,
+  delivery: optional(object({bot:text,expected:optional(nullable(number)),received:number,complete:boolean})) });
 const job = object({ id: text, series: text, mode: oneOf("archive", "watch"),
   status: oneOf("queued", "downloading", "retrying", "checking", "transferring", "paused", "failed", "waiting", "cancelled", "removing", "complete", "deleted", "missing", "preview"),
   item, received: maybeNumber, speed: maybeNumber, createdAt: maybeText, completedAt: maybeText,
@@ -30,12 +32,14 @@ const usage = object({ payloadBytes: maybeNumber, publishedBytes: maybeNumber, c
 const updates = object({ state: optional(oneOf("manual", "idle", "development", "checking", "current", "unpublished", "available", "downloading", "ready", "error")),
   version: maybeText, percent: maybeNumber, lastCheckedAt: optional(nullable(text)), deferred: maybeBoolean });
 const profile = optional(nullable(object({ name: maybeText, username: maybeText })));
-const connection = object({ connected: boolean, profile, restoringSession: maybeBoolean, connectionError: optional(nullable(text)) });
+const connection = object({ connected: boolean, profile, restoringSession: maybeBoolean, connectionError: optional(nullable(text)),
+  hasCredentials: maybeBoolean, jobs: optional(jobs), usage: optional(usage), currentBatchId: maybeText, channels: optional(array(channel)), catalogue: optional(nullable(catalogue)) });
 const bootstrap = object({ settings: optional(settings), channels: optional(array(channel)), catalogue: optional(nullable(catalogue)), jobs: optional(jobs), usage: optional(usage),
+  shutdown:optional(shutdown),
   connected: maybeBoolean, profile, currentBatchId: maybeText, restoringSession: maybeBoolean, connectionError: optional(nullable(text)),
   hasCredentials: maybeBoolean, firstRun: maybeBoolean, customTitleBar: maybeBoolean, appName: maybeText, version: maybeText, environment: maybeText });
-const discovery = object({ source: optional(object({ id: text, title: text, linked: maybeBoolean })), groups: optional(array(channel)), channel: optional(channel), notice: maybeText,
-  messages: optional(array(object({ text, links: array(object({ id: text, label: text, kind: text, automatic: maybeBoolean })) }))) });
+const discovery = object({ source: optional(object({ id: text, title: text, linked: maybeBoolean })), groups: optional(array(channel)), channel: optional(channel), notice: maybeText, expired:maybeBoolean, catalogue:optional(catalogue),
+  messages: optional(array(object({ text, links: array(object({ id: text, label: text, hint:maybeText, kind: text, automatic: maybeBoolean })) }))) });
 const joined = object({ channel, channels: array(channel) });
 const watch = object({ channel, mode: oneOf("archive", "watch"), automatic: maybeBoolean, error: maybeText });
 const watches = array(watch);
@@ -46,6 +50,7 @@ const suggestions = array(object({ id: text, apiId: loginId(), phone: text }));
 function loginId(): Schema<string | number> { return { parse: value => typeof value === "number" ? number.parse(value) : text.parse(value) }; }
 
 export const responses = {
+  "shutdown-set":shutdown,
   bootstrap, settings, channels: array(channel), scan: catalogue, connect: connection,
   "choose-folder": settings, "find-missing": jobs, enqueue: array(text),
   "queue-control": jobs, "retry-naming": jobs, "remove-history": jobs, "delete-job": jobs,
@@ -57,9 +62,9 @@ export const responses = {
   "clear-app-data": object({ cleared: boolean, jobs: optional(jobs), channels: optional(array(channel)), catalogue: optional(nullable(catalogue)), usage: optional(usage), currentBatchId: maybeText }),
   "reset-activity": usage, "update-later": updates, "update-status": updates, "update-check": updates, "update-download": updates, "update-install": updates,
   "watch-list": watches, "watch-set": watches, "subscription-choices": choices,
-  "discovery-source": discovery, "discovery-search": discovery, "discovery-open-message": discovery, "discovery-follow": discovery, "complete-subscriptions": discovery, "discovery-join": joined,
+  "discovery-source": discovery, "discovery-search": discovery, "discovery-open-message": discovery, "discovery-follow": discovery, "discovery-collect":discovery, "complete-subscriptions": discovery, "discovery-join": joined,
   "discovery-cancel": ignored, "window-theme": ignored, "confirmation-reply": ignored,
-  "auth-reply": ignored, "finish-onboarding": ignored, disconnect: ignored,
+  "auth-reply": ignored, "finish-onboarding": ignored, disconnect: object({ connected: boolean, revoked: maybeBoolean }),
 };
 export interface Requests extends DownloadRequests {
   bootstrap: undefined; settings: Partial<Settings>; channels: undefined; scan: { id: string };
@@ -72,6 +77,7 @@ export interface Requests extends DownloadRequests {
   "subscription-choices": undefined; "discovery-source": { groupId?: string } | undefined;
   "discovery-search": { query: string; sourceId: string }; "discovery-open-message": { link: string };
   "discovery-follow": { id: string }; "complete-subscriptions": { ids: string[] }; "discovery-join": { id: string };
+  "discovery-collect": undefined;
   "discovery-cancel": undefined; "window-theme": { color: string; symbolColor: string };
   "confirmation-reply": { id: string; response: number }; "auth-reply": { id: string; value?: string; cancel?: boolean };
   "finish-onboarding": undefined; disconnect: undefined;
@@ -88,7 +94,7 @@ const downloadContract: { [K in keyof DownloadResponses]: Schema<DownloadRespons
 void downloadContract;
 
 export const events = {
-  queue: jobs, usage, updates, connection,
+  queue: jobs, usage, updates, connection, shutdown,
   "scan-progress": object({ scanned: number, found: number }),
   "new-episodes": object({ count: number, title: text, automatic: boolean }),
   "auth-error": text, "auth-prompt": object({ id: text, label: text, kind: text }),

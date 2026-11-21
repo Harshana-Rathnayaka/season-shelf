@@ -41,6 +41,7 @@ export function isSearchReply(message, botId, requestId) {
   const sender = message.fromId;
   if (sender && sender.className !== "PeerUser") return false;
   const senderId = sender?.userId ?? message.senderId;
-  return !message.out && String(senderId) === String(botId) && message.id > requestId &&
+  const allowed = Array.isArray(botId) ? botId.map(String) : [String(botId)];
+  return !message.out && allowed.includes(String(senderId)) && message.id > requestId &&
     (message.replyTo?.replyToMsgId === requestId || message.replyTo?.replyToTopId === requestId);
 }

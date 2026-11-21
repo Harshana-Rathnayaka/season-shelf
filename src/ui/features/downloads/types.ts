@@ -32,6 +32,10 @@ export interface DownloadRecord {
 }
 
 export type DownloadTab = "ongoing" | "finished";
+export interface ShutdownStatus {
+  available:boolean;enabled:boolean;phase:"off" | "waiting" | "countdown" | "requested" | "error";
+  remainingSeconds:number;message:string;
+}
 export type QueueControl = "pause" | "resume" | "remove";
 
 export interface DownloadsState {
@@ -39,10 +43,12 @@ export interface DownloadsState {
   downloadTab: DownloadTab;
   currentBatchId?: string;
   demo: boolean;
+  shutdown?:ShutdownStatus;
   stagingInfo?: { count: number; bytes: number } | null;
 }
 
 export type DownloadCommand =
+  | { action:"shutdown-toggle";enabled:boolean }
   | { action: "download-tab"; tab: DownloadTab }
   | { action: "bulk-job"; control: "pause" | "resume" }
   | { action: "job"; job: string; control: QueueControl }
@@ -54,6 +60,7 @@ export type DownloadActionHandler = (command: DownloadCommand) => Promise<void>;
 
 /** Contracts for the existing download IPC endpoints; main still validates input. */
 export interface DownloadRequests {
+  "shutdown-set":{enabled:boolean};
   "queue-control": { id?: string; all?: boolean; action: QueueControl };
   "open-job": { id: string };
   "reveal-job": { id: string };
@@ -65,6 +72,7 @@ export interface DownloadRequests {
   "cleanup-staging": undefined;
 }
 export interface DownloadResponses {
+  "shutdown-set":ShutdownStatus;
   "queue-control": DownloadRecord[];
   "open-job": void;
   "reveal-job": void;

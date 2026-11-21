@@ -93,6 +93,20 @@ dialog p {
   right: 12px;
   top: 12px;
 }
+.dialog-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -20px -20px 4px;
+}
+.dialog-navigation .dialog-close {
+  position: static;
+  margin-left: auto;
+}
+.dialog-back .icon {
+  transform: rotate(180deg);
+}
 .modal-icon {
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);

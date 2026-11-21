@@ -293,6 +293,148 @@ test("discovery sends only a submitted query and continues after explicit result
   assert.match(f.document.querySelector('.library-panel h2').textContent,/Banshee/);
 });
 
+test('MCF bot deliveries load directly into the library and allow a read-only delivery recheck',async t=>{
+  const makeItem=n=>({...parseEpisode({id:String(200+n),filename:`The.Flash.S01E0${n}.720p.x265.mkv`,size:1024}),collectionId:'bot:2:flash'});
+  const delivered=count=>({channel:{id:'bot:2:flash',title:'The Flash (2014)'},items:Array.from({length:count},(_,i)=>makeItem(i+1)),
+    source:'bot',sourceWarning:'Bot messages may be deleted. Received files can expire.',scanned:count,
+    delivery:{bot:'MCFHelper02Bot',expected:2,received:count,complete:count===2}});
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async method=>{
+    if(method==='discovery-source')return {source:{id:'source',title:'MCF group'}};
+    if(method==='discovery-search')return {messages:[{text:'Choose a season',links:[{id:'full-season',label:'මුළු Season එකම ගන්න',hint:'Download entire season',kind:'callback',automatic:false}]}]};
+    if(method==='discovery-follow')return {catalogue:delivered(1)};
+    if(method==='discovery-collect')return {catalogue:delivered(2)};
+    throw Error(`Unexpected action ${method}`);
+  });
+  f.click('[data-action="choose-series"]');f.click('[data-action="discover"]');f.click('[data-action="discovery-source"]');
+  await new Promise(r=>setTimeout(r,0));
+  const form=f.document.querySelector('#discovery-form');form.elements.query.value='The Flash';
+  form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));
+  assert.match(f.document.querySelector('[data-choice="full-season"]').textContent,/Download entire season/);
+  assert.equal(f.calls.filter(c=>c.method==='discovery-follow').length,0);
+  f.click('[data-choice="full-season"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('#dialog').open,false);
+  assert.match(f.document.querySelector('.library-panel h2').textContent,/The Flash/);
+  assert.equal(f.document.querySelectorAll('tbody tr').length,1);
+  assert.match(f.document.querySelector('.review-note').textContent,/deleted/);
+  assert.equal(f.document.querySelector('[data-action="watch-series"]').hidden,true);
+  assert.equal(f.calls.some(c=>c.method==='discovery-join' || c.method==='scan'),false);
+  f.click('[data-action="collect-delivery"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelectorAll('tbody tr').length,2);
+  assert.equal(f.calls.filter(c=>c.method==='discovery-collect').length,1);
+});
+
+test('refreshed chat picker shows MCF helper DMs and opens existing files without starting a bot',async t=>{
+  const chat={id:'user:2',title:'MCF Helper 2',source:'bot'};
+  const f=await fixture(t,{settings:{theme:'dark',hiddenKeywords:['helper']},channels:[],jobs:[]},async method=>{
+    if(method==='channels')return [chat];
+    if(method==='scan')return {channel:{id:'bot:2:flash',title:'The Flash'},source:'bot',
+      sourceWarning:'Bot files may be deleted.',items:[parseEpisode({id:'201',filename:'The.Flash.S01E01.720p.x265.mkv',size:1024})]};
+    return [];
+  });
+  f.click('[data-action="choose-series"]');f.click('[data-action="refresh-channels"]');
+  await new Promise(r=>setTimeout(r,0));
+  assert.match(f.document.querySelector('#channel-results').textContent,/MCF Helper 2/);
+  f.click('[data-channel="user:2"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.find(c=>c.method==='scan').payload.id,'user:2');
+  assert.equal(f.calls.some(c=>c.method.startsWith('discovery-')),false);
+  assert.match(f.document.querySelector('.library-panel h2').textContent,/The Flash/);
+  assert.equal(f.document.querySelectorAll('tbody tr').length,1);
+});
+
+test('app dialog Back restores picker filters, group scroll and search drafts without sending a bot request',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[{id:'1',title:'MCF Series'}],jobs:[]},async(method,payload)=>{
+    if(method==='discovery-source')return payload?.groupId
+      ? {source:{id:'fresh-source',title:'MovieClubFamily Chat'}}
+      : {groups:[{id:'group',title:'MovieClubFamily Chat'},{id:'other',title:'Other group'}]};
+    return [];
+  });
+  const input=(selector,value)=>{const field=f.document.querySelector(selector);field.value=value;field.dispatchEvent(new f.window.Event('input',{bubbles:true}));};
+  const back=async()=>{f.click('[data-action="dialog-back"]');await new Promise(r=>setTimeout(r,0));};
+  f.click('[data-action="choose-series"]');
+  assert.equal(!!f.document.querySelector('[data-action="dialog-back"]'),false);
+  input('#channel-search','MCF');f.document.querySelector('#channel-results').scrollTop=120;
+  f.click('[data-action="discover"]');
+  assert.ok(f.document.querySelector('[data-action="dialog-back"]'));
+  assert.ok(f.document.querySelector('[data-action="close-dialog"]'));
+  f.click('[data-action="discovery-source"]');await new Promise(r=>setTimeout(r,0));
+  input('#search-group-filter','Family');f.document.querySelector('.discovery-results').scrollTop=180;
+  f.click('[data-choice="group"]');await new Promise(r=>setTimeout(r,0));
+  input('#discovery-form input[name="query"]','The Flash');
+  await back();
+  assert.equal(f.document.querySelector('#search-group-filter').value,'Family');
+  assert.equal(f.document.querySelector('.discovery-results').scrollTop,180);
+  assert.equal(f.document.querySelectorAll('#search-group-results button').length,1);
+  f.click('[data-choice="group"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('#discovery-form input[name="query"]').value,'The Flash');
+  await back();await back();
+  assert.equal(!!f.document.querySelector('#discovery-form'),false);
+  assert.match(f.document.querySelector('#dialog h2').textContent,/Find your next series/);
+  await back();
+  assert.equal(f.document.querySelector('#channel-search').value,'MCF');
+  assert.equal(f.document.querySelector('#channel-results').scrollTop,120);
+  assert.equal(f.document.activeElement.id,'channel-search');
+  assert.equal(f.calls.some(c=>['discovery-search','discovery-follow','discovery-join'].includes(c.method)),false);
+  assert.equal(!!f.document.querySelector('[data-action="dialog-back"]'),false);
+  f.click('[data-action="close-dialog"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('#dialog').open,false);
+  f.click('[data-action="choose-series"]');assert.equal(f.document.querySelector('#channel-search').value,'');
+  f.click('[data-action="close-dialog"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('#dialog').open,false);
+});
+
+test('shutdown is opt-in on Downloads and its countdown can be cancelled from another page',async t=>{
+  const off={available:true,enabled:false,phase:'off',remainingSeconds:0,message:''};
+  const item={filename:'Show.S01E01.720p.x265.mkv',size:1024,season:1,episode:1};
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[{id:'one',series:'Show',mode:'archive',status:'queued',item}],shutdown:off},
+    async(method,payload)=>method==='shutdown-set'?{...off,enabled:payload.enabled,phase:payload.enabled?'waiting':'off'}:[]);
+  f.click('[data-page="queue"]');
+  const toggle=()=>f.document.querySelector('[data-action="shutdown-toggle"]');
+  assert.equal(toggle().getAttribute('role'),'switch');assert.equal(toggle().getAttribute('aria-checked'),'false');
+  assert.equal(toggle().disabled,false);
+  f.click('[data-action="shutdown-toggle"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(toggle().getAttribute('aria-checked'),'true');
+  assert.equal(f.calls.find(c=>c.method==='shutdown-set').payload.enabled,true);
+  f.emit({type:'shutdown',data:{...off,enabled:true,phase:'countdown',remainingSeconds:60,message:'Saved'}});
+  assert.match(f.document.querySelector('.shutdown-banner').textContent,/60 seconds/);
+  f.click('[data-page="library"]');
+  assert.ok(f.document.querySelector('[data-action="cancel-shutdown"]'));
+  f.click('[data-action="cancel-shutdown"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(!!f.document.querySelector('.shutdown-banner'),false);
+  assert.deepEqual(f.calls.filter(c=>c.method==='shutdown-set').map(c=>c.payload.enabled),[true,false]);
+});
+
+test('shutdown control is unavailable in the preview and without unfinished downloads',async t=>{
+  const sample=await fixture(t);sample.click('[data-page="queue"]');
+  assert.equal(sample.document.querySelector('[data-action="shutdown-toggle"]').disabled,true);
+  const live=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[],shutdown:{available:true,enabled:false,phase:'off',remainingSeconds:0,message:''}});
+  live.click('[data-page="queue"]');assert.equal(live.document.querySelector('[data-action="shutdown-toggle"]').disabled,true);
+});
+
+test('expired bot menus show a clear recovery screen and only post a fresh search after submission',async t=>{
+  let sources=0,searches=0;
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async(method)=>{
+    if(method==='discovery-source')return {source:{id:`source-${++sources}`,title:'MovieClubFamily Chat'}};
+    if(method==='discovery-search'){searches++;return {messages:[{text:'Choose a season',links:[{id:'season',label:'Season 1',kind:'callback',automatic:false}]}]};}
+    if(method==='discovery-follow')return {expired:true,notice:'This search is too old. Type the name in the group again.',messages:[]};
+    return [];
+  });
+  f.click('[data-action="choose-series"]');f.click('[data-action="discover"]');f.click('[data-action="discovery-source"]');
+  await new Promise(r=>setTimeout(r,0));
+  const submit=async()=>{const form=f.document.querySelector('#discovery-form');form.elements.query.value='The Flash';form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));};
+  await submit();f.click('[data-choice="season"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('#dialog h2').textContent,'Search expired');
+  assert.match(f.document.querySelector('#dialog [role="alert"]').textContent,/buttons no longer work/);
+  assert.equal(!!f.document.querySelector('[data-action="discovery-follow"]'),false);
+  assert.equal(f.calls.filter(c=>c.method==='discovery-follow').length,1);
+  f.click('#dialog [data-action="discover"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(searches,1,'Opening recovery must not automatically post a search');
+  f.click('[data-action="discovery-source"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('#discovery-form input[name="query"]').value,'The Flash');
+  assert.equal(f.document.querySelector('#discovery-form input[name="sourceId"]').value,'source-2');
+  await submit();assert.equal(searches,2);
+  assert.equal(f.calls.filter(c=>c.method==='discovery-search')[1].payload.sourceId,'source-2');
+});
+
 test("discovery failures replace the waiting overlay with an actionable visible error",async(t)=>{
   const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async(method)=>{
     if(method==='discovery-source') throw new Error('Telegram request failed');
@@ -324,12 +466,12 @@ test("all pages keep their heading outside the scroll pane and retain position o
 });
 
 test("account button opens an anchored popup with logout without navigating",async(t)=>{
-  const f=await fixture(t,{settings:{theme:'dark'},profile:{name:'Anonymous',username:'D3M0NHA2H'},jobs:[],channels:[]});
+  const f=await fixture(t,{settings:{theme:'dark'},profile:{name:'Anonymous',username:'example_viewer'},jobs:[],channels:[]});
   f.click('.profile');
   await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(f.document.querySelector('#account-popover').hidden,false);
   assert.ok(f.document.querySelector('.library-shell'));
-  assert.match(f.document.querySelector('#account-popover').textContent,/@D3M0NHA2H/);
+  assert.match(f.document.querySelector('#account-popover').textContent,/@example_viewer/);
   assert.ok(f.document.querySelector('#account-popover [data-action="disconnect"]'));
   f.document.dispatchEvent(new f.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
   await new Promise(resolve=>setTimeout(resolve,0));
@@ -435,7 +577,7 @@ test('first-run guide persists dismissal and updates use readable status in Abou
 });
 
 test('themed confirmation close cancels and saved login fills all three fields',async t=>{
-  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async(method)=>method==='login-suggestions'?[{id:'saved',phone:'***6789',apiId:12}]:method==='login-suggestion'?{apiId:12,apiHash:'a'.repeat(32),phone:'+94123456789'}:{});
+  const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async(method)=>method==='login-suggestions'?[{id:'saved',phone:'***6789',apiId:12}]:method==='login-suggestion'?{apiId:12,apiHash:'a'.repeat(32),phone:'+94123456789'}:method==='disconnect'?{connected:false,revoked:true}:{});
   f.emit({type:'confirmation',data:{id:'token',title:'Delete file?',message:'Move file?',detail:'Media will go to Recycle Bin.',buttons:['Keep','Delete']}});
   assert.ok(f.document.querySelector('[data-action="confirmation-reply"]'));
   f.click('[data-action="close-dialog"]');await new Promise(r=>setTimeout(r,0));
@@ -444,6 +586,27 @@ test('themed confirmation close cancels and saved login fills all three fields',
   f.click('.profile');f.click('#account-popover [data-action="connect"]');await new Promise(r=>setTimeout(r,0));
   f.click('[data-action="use-login"]');await new Promise(r=>setTimeout(r,0));
   const form=f.document.querySelector('#connect-form');assert.equal(form.elements.apiId.value,'12');assert.equal(form.elements.apiHash.value,'a'.repeat(32));assert.equal(form.elements.phone.value,'+94123456789');
+});
+
+test('signing into another account replaces the previous account workspace in the renderer',async t=>{
+  const oldItem=parseEpisode({id:'1',filename:'Private.Show.S01E01.720p.x265.mkv',size:100});
+  const f=await fixture(t,{settings:{theme:'dark'},profile:{name:'First account'},channels:[],
+    catalogue:{channel:{id:'1',title:'Private show'},items:[oldItem]},
+    jobs:[{id:'old-job',series:'Private show',mode:'archive',status:'paused',item:oldItem}]},async method=>{
+    if(method==='disconnect')return {connected:false,revoked:true};
+    if(method==='connect')return {connected:true,profile:{name:'Second account'},jobs:[],catalogue:null,channels:[],usage:{payloadBytes:0},currentBatchId:'second'};
+    if(method==='channels' || method==='login-suggestions')return [];
+    return {};
+  });
+  f.click('.profile');f.click('[data-action="disconnect"]');await new Promise(r=>setTimeout(r,0));
+  f.click('.profile');f.click('#account-popover [data-action="connect"]');await new Promise(r=>setTimeout(r,0));
+  const form=f.document.querySelector('#connect-form');form.elements.apiId.value='123';form.elements.apiHash.value='a'.repeat(32);form.elements.phone.value='test-phone';
+  form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));
+  f.click('[data-action="close-dialog"]');await new Promise(r=>setTimeout(r,0));
+  f.click('[data-page="queue"]');
+  assert.equal(f.document.querySelectorAll('.queue-item').length,0);
+  assert.doesNotMatch(f.document.querySelector('main').textContent,/Private show/);
+  assert.match(f.document.querySelector('.profile').textContent,/Second account/);
 });
 
 test('missing history has no navigation badge and an empty batch hides its progress track',async t=>{

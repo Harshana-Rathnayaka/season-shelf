@@ -32,12 +32,15 @@
 | Discover series | Browse joined channels or follow supported bot search results. |
 | Choose your files | Filter by quality and codec, or manually select Unverified files. |
 | Control downloads | Pause, resume, schedule download hours and limit bandwidth. |
+| Shut down after downloading | On Windows, enable a one-time shutdown after every queued file is saved. |
 | Keep folders tidy | Save episodes by season and normalise filename separators. |
 | Track your collection | Find missing episodes against app-managed history and manage saved files. |
 | Follow new episodes | Check hourly while the app runs; notify or queue new uploads. |
 | Make it yours | Adjust theme, accent colour, font size and weight. |
 
 Download and Watch folders keep permanent and viewing copies separate. You decide when to delete files.
+
+On **Downloads → Ongoing**, enable **Shut down when downloads finish** for the current session. It waits for downloads, verification, file transfers and filename updates, then shows a 60-second countdown with **Cancel shutdown** on every page. Paused, failed and scheduled jobs keep it waiting; removing an unfinished job cancels it. The option resets when the app exits or you change accounts. Windows receives a normal shutdown request without forced application closure ([Microsoft command reference](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/shutdown)).
 
 <a id="get-started"></a>
 
@@ -91,6 +94,10 @@ Just exploring? Open the [sample preview](docs/preview.html) locally. It uses sa
 
 Sessions and remembered sign-in details are encrypted using operating-system storage. Passwords and verification codes are not saved. Development and installed apps use separate profiles.
 
+A new installation contains no Telegram account or API credentials. Each user supplies their own API ID, API hash, phone number and Telegram verification (including two-step verification when enabled). Entering account details always starts a fresh sign-in; only Reconnect saved account or startup restoration reuses a locally saved session. Queue history, channel caches and watches are scoped to the verified Telegram account. Switching accounts preserves the other account's files and partial downloads.
+
+Sign out removes the local session first and asks Telegram to revoke it. If Telegram is unreachable, revoke that session from Telegram > Devices. Remembered API/phone suggestions remain local until you choose Forget suggestions; they cannot sign in without Telegram authentication. People sharing a computer should use separate operating-system user accounts.
+
 **Clear app data keeps downloaded files and partials on disk.** It clears download/history records, the selected series, watches and lifetime totals; login, preferences and onboarding remain. **Reset lifetime totals** clears only counters. **Remove from history** (or **Clear finished history**) also keeps disk files, but the app forgets those downloads and Select missing may offer them again. To delete media, open **Finished ? File details ? Move file to Recycle Bin** and confirm, or use File Explorer/Finder.
 
 Closing pauses downloads, including when the app stays in the tray. Verification and transfers finish safely; resume from the tray or Downloads. Interrupted jobs return paused after restart.
@@ -133,10 +140,13 @@ Local installer and real version-to-version update acceptance are separate from 
 
 ## Know the limits
 
-- Bot automation supports specific Telegram flows. Some attachment links, separate callback replies and approval-only subscriptions still need Telegram.
+- MCF discovery supports `@MCFHelper01Bot`, `@MCFHelper02Bot` and `@MCFHelper03Bot`: choose the title, season, entire-season option and quality, then collect the private episode delivery into the library. Sinhala menu labels are preserved. Downloads start after you select files in the library.
+- **Change series → Refresh channels** also lists these helper bots' existing private chats. Opening one reads up to 1,000 recent messages without sending Start. Files from multiple series require manual selection in Unverified.
+- Bot deliveries can take up to two minutes to collect. Use **Check delivery again** for late files. Temporary messages may be deleted; request the season again if attachments expire. Series watches apply to channels, not temporary bot deliveries.
+- Bot automation supports specific Telegram flows. Unsupported buttons and approval-only subscriptions still need Telegram. Changes made by MCF may require updates; the helper workflow has automated simulations but still needs live acceptance testing.
 - Missing-episode checks use app-managed history, not arbitrary folders on disk.
 - Watches need the app running; downloads cannot continue while the computer sleeps.
-- Alternate-bot 1080p retrieval and WhatsApp notifications are not implemented.
+- WhatsApp notifications are not implemented.
 
 See the [roadmap](docs/ROADMAP.md) for next steps and remaining release prerequisites.
 

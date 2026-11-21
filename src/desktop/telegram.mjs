@@ -1,6 +1,9 @@
 import { createRequire } from "node:module";
 const { version: appVersion } = createRequire(import.meta.url)("../../package.json");
 import { rangeSource } from "./range-source.mjs";
+import { episodeFromMessage } from "./telegram-media.mjs";
+import { isBotReply, isMcfBot } from "./mcf.mjs";
+import { deliveryCatalogue } from "./bot-delivery.mjs";
 import { TelegramClient, Api } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
 import { UpdateConnectionState } from "teleproto/network/UpdateConnectionState.js";
@@ -8,17 +11,19 @@ import bigInt from "big-integer";
 import { parseEpisode } from "../core/catalog.mjs";
 
 export class TelegramAdapter {
-  constructor({ loadCredentials, saveCredentials, ask, notify, createClient }) {
-    Object.assign(this, { loadCredentials, saveCredentials, ask, notify });
+  constructor({ loadCredentials, saveCredentials, clearCredentials, ask, notify, createClient }) {
+    Object.assign(this, { loadCredentials, saveCredentials, clearCredentials, ask, notify });
     this.client = null;
     this.connected = false;
     this.createClient = createClient || ((...args) => new TelegramClient(...args));
   }
   async connect(credentials, { interactive = true } = {}) {
-    if (this.connecting) throw new Error("Sign-in is already in progress");
+    if (this.connecting || this.loggingOut) throw new Error("An account operation is already in progress");
     this.connecting = true;
     try {
-      const saved = this.loadCredentials();
+      // Supplying details always means a fresh sign-in. An API ID identifies
+      // an application, not a Telegram user, and must never select a session.
+      const saved = credentials ? null : this.loadCredentials();
       const auth = credentials || saved;
       if (
         !auth ||
@@ -27,10 +32,11 @@ export class TelegramAdapter {
         !/^[a-f0-9]{32}$/i.test(auth.apiHash || "")
       )
         throw new Error("Enter your Telegram API ID and API hash");
+      if (credentials) this.clearCredentials?.();
       this.authorized = false;
       this.connected = false;
       await this.client?.disconnect();
-      const session = saved?.apiId === Number(auth.apiId) ? saved.session : "";
+      const session = saved?.session || "";
       if (!interactive && !session) throw new Error("Sign in once to remember this account");
       this.client = this.createClient(
         new StringSession(session || ""),
@@ -79,6 +85,10 @@ export class TelegramAdapter {
       });
       if (!(await this.client.checkAuthorization()))
         throw new Error("Sign-in was not completed");
+      const me = await this.client.getMe();
+      if (!/^\d+$/.test(String(me?.id || '')))
+        throw new Error('Telegram account identity could not be verified. Please reconnect.');
+      this.accountId = String(me.id);
       this.saveCredentials({
         apiId: Number(auth.apiId),
         apiHash: auth.apiHash,
@@ -87,21 +97,19 @@ export class TelegramAdapter {
       this.authorized = true;
       this.needsReconnect = false;
       this.connected = true;
-      // Profile failure must not invalidate an otherwise authorised session.
-      this.profile = null;
-      try {
-        const me = await this.client.getMe();
-        this.profile = {
-          name: [me.firstName, me.lastName].filter(Boolean).join(" ").slice(0, 160),
-          username: String(me.username || "").slice(0, 64),
-        };
-      } catch { /* Account details can be refreshed on the next connection. */ }
+      this.profile = {
+        name: [me.firstName, me.lastName].filter(Boolean).join(" ").slice(0, 160),
+        username: String(me.username || "").slice(0, 64),
+      };
       return { connected: true, profile: this.profile };
     } catch (error) {
       this.authorized = false;
       this.connected = false;
       this.profile = null;
-      await this.client?.disconnect();
+      this.accountId = null;
+      const client = this.client;
+      this.client = null;
+      await client?.disconnect();
       throw error;
     } finally {
       this.connecting = false;
@@ -138,6 +146,7 @@ export class TelegramAdapter {
     return this.reconnecting;
   }
   input(peer) {
+    if (peer.type === "user") return new Api.InputPeerUser({userId:bigInt(peer.id),accessHash:bigInt(peer.accessHash)});
     return peer.type === "channel"
       ? new Api.InputPeerChannel({
           channelId: bigInt(peer.id),
@@ -151,13 +160,15 @@ export class TelegramAdapter {
       limit: 300,
     })) {
       const e = dialog.entity;
-      if (!["Channel", "Chat"].includes(e.className)) continue;
+      const bot=e.className==='User' && e.bot && isMcfBot(e.username);
+      if (!["Channel", "Chat"].includes(e.className) && !bot) continue;
       result.push({
-        id: String(e.id),
+        id: bot ? `user:${e.id}` : String(e.id),
         title: dialog.title || "Untitled channel",
+        ...(bot ? {source:'bot'} : {}),
         peer: {
           id: String(e.id),
-          type: e.className === "Channel" ? "channel" : "chat",
+          type: bot ? "user" : e.className === "Channel" ? "channel" : "chat",
           accessHash: String(e.accessHash || 0),
         },
       });
@@ -168,6 +179,7 @@ export class TelegramAdapter {
     const client = this.requireClient();
     const input = this.input(channel.peer);
     const entity = await client.getEntity(input);
+    if(channel.peer.type==='user')return this.scanBotInbox(channel,entity,{minId,limit:Math.min(limit,1000)});
     if (entity.noforwards)
       throw new Error("This channel restricts saving content");
     const items = [];
@@ -206,6 +218,38 @@ export class TelegramAdapter {
       truncated: scanned >= limit,
       scannedAt: new Date().toISOString(),
     };
+  }
+  async scanBotInbox(channel,bot,{minId=0,limit=1000}={}) {
+    if(bot.className!=='User' || !bot.bot || !isMcfBot(bot.username) || String(bot.id)!==channel.peer.id)
+      throw new Error('This chat is not a supported MCF bot. Refresh your chat list.');
+    if(bot.noforwards)throw new Error('This bot restricts saving content');
+    const messages=[];let scanned=0;
+    for await(const message of this.history(this.input(channel.peer),{minId,limit})) {
+      scanned++;
+      if(isBotReply(message,bot.id))messages.push(message);
+      if(scanned%100===0)this.notify?.('scan-progress',{scanned,found:0});
+    }
+    const catalogue=deliveryCatalogue(messages,bot,{}, {truncated:scanned>=limit});
+    if(catalogue)return {...catalogue,scanned};
+    return {channel,items:[],source:'bot',scanned,scannedAt:new Date().toISOString(),
+      delivery:{bot:bot.username,afterId:minId,expected:null,received:0,complete:false,selection:{}},
+      sourceWarning:'No downloadable episode files remain in this bot chat. Request a season through MCF search, then check the delivery again.'};
+  }
+  async refreshDelivery(catalogue) {
+    if (catalogue?.source !== 'bot' || catalogue.channel?.peer?.type !== 'user') throw new Error('Choose a bot delivery first');
+    const client=this.requireClient(), peer=catalogue.channel.peer;
+    const ids=catalogue.items.map(item=>Number(item.id));
+    const messages=ids.length ? await client.getMessages(this.input(peer),{ids}) : [];
+    const originals=new Map(catalogue.items.map(item=>[item.id,item]));
+    const items=messages.filter(message=>isBotReply(message,peer.id)).map(message=>episodeFromMessage(message,peer))
+      .filter(item=>item && originals.get(item.id)?.documentId===item.documentId && originals.get(item.id)?.size===item.size)
+      .map(item=>({...item,...(originals.get(item.id).reason ? {reason:originals.get(item.id).reason} : {}),collectionId:catalogue.channel.id}));
+    const episodes=new Set();
+    for(const item of items.filter(item=>!item.reason))
+      for(let n=item.episode;n<=item.episodeEnd;n++)episodes.add(`${item.season}:${n}`);
+    return {...catalogue,items,scanned:messages.length,scannedAt:new Date().toISOString(),
+      ...(catalogue.delivery ? {delivery:{...catalogue.delivery,received:episodes.size,complete:catalogue.delivery.complete && items.length===catalogue.items.length}} : {}),
+      sourceWarning:items.length<catalogue.items.length ? 'Some bot messages were deleted or are unavailable. Request the season again for missing files.' : catalogue.sourceWarning};
   }
   async *history(input, { limit, minId }) {
     const client = this.requireClient();
@@ -249,7 +293,7 @@ export class TelegramAdapter {
         ids: [Number(item.id)],
       });
       if (!message?.document || message.noforwards)
-        throw new Error("Attachment is no longer available for saving");
+        throw new Error(item.peer.type === 'user' ? "Bot attachment expired, was deleted, or cannot be saved. Request the season again." : "Attachment is no longer available for saving");
       if (
         String(message.document.id) !== item.documentId ||
         Number(message.document.size) !== item.size
@@ -299,10 +343,36 @@ export class TelegramAdapter {
   }
 
   async disconnect() {
+    const client = this.client;
+    this.client = null;
     this.authorized = false;
     this.needsReconnect = false;
     this.connected = false;
     this.profile = null;
-    await this.client?.disconnect();
+    this.accountId = null;
+    await client?.disconnect();
+  }
+
+  async logout() {
+    if (this.connecting || this.loggingOut) throw new Error('An account operation is already in progress');
+    // Forget disk credentials before network I/O, even when offline or revoked.
+    this.clearCredentials?.();
+    this.loggingOut = true;
+    const client = this.client;
+    const authorized = this.authorized;
+    this.client = null;
+    this.authorized = this.connected = false;
+    this.profile = this.accountId = null;
+    this.needsReconnect = false;
+    let revoked = false;
+    try {
+      if (client && authorized) revoked = await client.logOut();
+    } catch { /* Local logout must succeed when Telegram is unreachable. */ }
+    finally {
+      try { await client?.disconnect(); } catch { /* Already signed out locally. */ }
+      try { await client?.session?.delete?.(); } catch { /* Detached client cannot be reused. */ }
+      this.loggingOut = false;
+    }
+    return { revoked };
   }
 }

@@ -6,6 +6,7 @@ export async function advanceDiscovery(method: DiscoveryMethod, payload: Discove
     onStage(method);
     const result = await call(method,payload);
     if (cancelled()) return null;
+    if (result.catalogue) return result;
     if (!automatic || result.source || result.groups) return result;
     if (result.channel) {
       onStage("discovery-join");

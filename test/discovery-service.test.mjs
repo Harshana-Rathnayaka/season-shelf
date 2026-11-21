@@ -74,7 +74,7 @@ test("search posts to the shared group and collects only the bot's replies to th
   let posts=0;
   const answer=(id,start)=>({...reply(id,start),replyTo:{replyToMsgId:10}});
   const service=fixture(groupClient({sendMessage:async(peer,options)=>{posts++;assert.equal(peer,group);assert.equal(options.message,"Banshee");return {id:10};},getMessages:async(peer,options)=>{
-    assert.equal(peer,group);if (!options.ids) assert.equal(options.replyTo,10);
+    assert.equal(peer,group);assert.equal(options.replyTo,undefined);
     poll++;
     return [answer(9,"old"),answer(11,poll>1 ? "edited" : "initial"),...(poll>1 ? [answer(12,"two")] : []),{...answer(13,"foreign"),senderId:2},reply(14,"no_reply_link"),{...answer(15,"other_request"),replyTo:{replyToMsgId:8}}];
   }}));
@@ -219,7 +219,7 @@ test("callback buttons retain message context and return a usable bot start link
   }});
   const result=service.presentMessages([message],peer);
   assert.equal(result.messages[0].links[0].kind,'callback');
-  assert.equal(result.messages[0].links[0].automatic,true);
+  assert.equal(result.messages[0].links[0].automatic,false);
   const next=await service.follow(result.messages[0].links[0].id);
   assert.equal(next.messages[0].links[0].kind,'bot-start');assert.equal(pressed,1);
   const stale=service.presentMessages([message],peer).messages[0].links[0].id;

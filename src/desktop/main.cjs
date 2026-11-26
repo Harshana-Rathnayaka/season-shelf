@@ -247,7 +247,7 @@ app
       let result;
       try { result = await operation; }
       catch(error) {
-        if(discovery.recentContext && /bot button changed|Search result expired/.test(error.message)) return discovery.recentSearch();
+        if(discovery.recentContext && /Search result expired/.test(error.message)) return discovery.recentSearch();
         throw error;
       }
       if(result.expired && discovery.recentContext) return discovery.recentSearch();

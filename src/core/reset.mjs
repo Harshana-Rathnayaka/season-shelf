@@ -12,7 +12,7 @@ export async function clearWorkspace(queue, store, watcher) {
     throw new Error('Pause downloads and wait for file checks to finish before clearing app data.');
   await removePending(queue,pendingEntries(queue).map(job=>job.id));
   for (const file of await orphanedPartials({...queue,jobs:[]})) await fs.rm(file.filename);
-  const data={jobs:[],catalogue:null,channels:[],watches:[],usage:freshUsage(),currentBatchId:randomUUID()};
+  const data={jobs:[],catalogue:null,channels:[],recentSeries:[],watches:[],usage:freshUsage(),currentBatchId:randomUUID()};
   store.setMany(data);
   queue.jobs=[];queue.usage=data.usage;queue.currentBatchId=data.currentBatchId;
   watcher.watches=[];

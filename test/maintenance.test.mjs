@@ -63,6 +63,7 @@ test('workspace reset removes partials before clearing metadata and retains comp
   const queue={jobs:data.jobs,staging,running:new Map(),namingLocks:new Set(),emit(){},pump(){},control(id,action){if(action==='pause')return;return fs.rm(path.join(staging,id+'.part')).then(()=>{this.jobs=this.jobs.filter(job=>job.id!==id);});}};const watcher={watches:[{}]};
   await clearWorkspace(queue,store,watcher);assert.deepEqual(data.jobs,[]);assert.equal(data.catalogue,null);assert.equal(data.usage.payloadBytes,0);assert.equal(data.credentials,'encrypted');assert.equal(data.onboardingComplete,true);assert.equal(await fs.readFile(file,'utf8'),'keep media');
   assert.deepEqual(await fs.readdir(staging),[]);
+  assert.deepEqual(data.recentSeries,[]);
   queue.running.set('active',{});await assert.rejects(clearWorkspace(queue,store,watcher),/Pause downloads/);
   queue.running.clear();queue.removals=new Map([['cleaning',Promise.resolve()]]);
   await assert.rejects(clearWorkspace(queue,store,watcher),/Pause downloads/);

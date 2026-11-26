@@ -80,7 +80,7 @@ export function createDialogs(element: HTMLDialogElement, callbacks: DialogCallb
           if(draft)drafts.set(view.kind,{...draft,link:"",linkOpen:false});
         }
       }
-      current = isNavigation(view) ? {...view,...drafts.get(view.kind)} : view;
+      current = isNavigation(view) ? {...view,...drafts.get(view.kind),...(view.kind==='discovery-search' && view.query!==undefined ? {query:view.query} : {})} : view;
       revision++;
       render();
       if (!element.open) element.showModal();

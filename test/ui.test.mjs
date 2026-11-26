@@ -5,7 +5,40 @@ import assert from "node:assert/strict";
 import { rendererSource } from "../scripts/lib/renderer-source.mjs";
 const rendererCode = await rendererSource();
 import { JSDOM } from "jsdom";
-async function fixture(t, bootstrap = null, handler = null) {
+
+test('Recent series lives inside Change series and resumes without posting a search',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async method=>{
+    if(method==='discovery-resume')return {messages:[{text:'Choose a season',links:[{id:'season-4',label:'Season 4',kind:'callback',automatic:false}]}]};
+    return [];
+  },[{id:'breaking-bad',title:'Breaking Bad (2008)',season:3,resolution:1080}]);
+  f.click('[data-action="choose-series"]');await new Promise(r=>setTimeout(r,0));
+  const recent=f.document.querySelector('#dialog .recent-series');
+  assert.match(recent.textContent,/Last requested: Season 3/);
+  assert.match(recent.textContent,/1080p/);
+  assert.equal(f.document.querySelector('.sidebar .recent-series'),null);
+  f.click('[data-action="discovery-resume"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.find(c=>c.method==='discovery-resume').payload.id,'breaking-bad');
+  assert.match(f.document.querySelector('#dialog').textContent,/Season 4/);
+  assert.equal(f.calls.some(c=>c.method==='discovery-search' || c.method==='discovery-follow'),false);
+});
+
+test('expired recent menus prefill the search and wait for explicit submission',async t=>{
+  const f=await fixture(t,{settings:{theme:'dark'},channels:[],jobs:[]},async method=>{
+    if(method==='discovery-resume')return {source:{id:'fresh',title:'MCF group'},query:'Breaking Bad',notice:'Post a fresh search to choose another season.'};
+    if(method==='discovery-search')return {messages:[{text:'Choose the matching title',links:[]}]};
+    return [];
+  },[{id:'breaking-bad',title:'Breaking Bad (2008)',season:3}]);
+  f.click('[data-action="choose-series"]');await new Promise(r=>setTimeout(r,0));
+  f.click('[data-action="discovery-resume"]');await new Promise(r=>setTimeout(r,0));
+  const form=f.document.querySelector('#discovery-form');
+  assert.equal(form.elements.query.value,'Breaking Bad');
+  assert.equal(form.elements.sourceId.value,'fresh');
+  assert.equal(f.calls.some(c=>c.method==='discovery-search'),false);
+  form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.find(c=>c.method==='discovery-search').payload.query,'Breaking Bad');
+});
+
+async function fixture(t, bootstrap = null, handler = null, recentSeries = []) {
   const dom = new JSDOM(
     '<div id="app"></div><dialog id="dialog"></dialog><div id="toast"></div>',
     { url: "https://sample.invalid", runScripts: "outside-only" },
@@ -15,6 +48,7 @@ async function fixture(t, bootstrap = null, handler = null) {
   let listener;
   if (bootstrap) window.shelf = { on(fn) {listener=fn;}, async call(method,payload) {
     calls.push({method,payload});
+    if (method === 'discovery-recent') return {ok:true,data:recentSeries};
     if (handler && method !== "bootstrap") return {ok:true,data:await handler(method,payload)};
     return {ok:true,data:method === "bootstrap" ? {...bootstrap,connected:true,demo:false} : []};
   } };
@@ -336,7 +370,7 @@ test('refreshed chat picker shows MCF helper DMs and opens existing files withou
   assert.match(f.document.querySelector('#channel-results').textContent,/MCF Helper 2/);
   f.click('[data-channel="user:2"]');await new Promise(r=>setTimeout(r,0));
   assert.equal(f.calls.find(c=>c.method==='scan').payload.id,'user:2');
-  assert.equal(f.calls.some(c=>c.method.startsWith('discovery-')),false);
+  assert.equal(f.calls.some(c=>c.method.startsWith('discovery-') && c.method!=='discovery-recent'),false);
   assert.match(f.document.querySelector('.library-panel h2').textContent,/The Flash/);
   assert.equal(f.document.querySelectorAll('tbody tr').length,1);
 });

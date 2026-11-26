@@ -94,7 +94,7 @@ app
         }),
     });
     const {Discovery} = await import("./discovery.mjs");
-    discovery = new Discovery(adapter);
+    discovery = new Discovery(adapter,{store});
     let settings = store.get("settings", {
       theme: "dark",
       concurrency: 2,
@@ -244,10 +244,18 @@ app
       return {};
     });
     const useDiscovery = async operation => {
-      const result = await operation;
+      let result;
+      try { result = await operation; }
+      catch(error) {
+        if(discovery.recentContext && /bot button changed|Search result expired/.test(error.message)) return discovery.recentSearch();
+        throw error;
+      }
+      if(result.expired && discovery.recentContext) return discovery.recentSearch();
       if (result.catalogue) { catalogue=result.catalogue; store.set("catalogue",catalogue); }
       return result;
     };
+    handle("discovery-recent", () => discovery.recentSeries());
+    handle("discovery-resume", ({id}) => useDiscovery(discovery.resumeSeries(id)));
     handle("discovery-search", ({query,sourceId}) => useDiscovery(discovery.search(query,sourceId)));
     handle("discovery-open-message", ({link}) => discovery.openMessageLink(link));
     handle("discovery-follow", ({id}) => useDiscovery(discovery.follow(id)));

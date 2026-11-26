@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { freshUsage } from './reset.mjs';
 
-const blank = () => ({ jobs: [], channels: [], catalogue: null, watches: [], usage: freshUsage(), currentBatchId: randomUUID() });
+const blank = () => ({ jobs: [], channels: [], catalogue: null, recentSeries: [], watches: [], usage: freshUsage(), currentBatchId: randomUUID() });
 
 /** Switch metadata only. Staged and completed files are never removed. */
 export function activateAccountWorkspace({ store, queue, watcher, accountId, adoptLegacy = false }) {
@@ -15,8 +15,9 @@ export function activateAccountWorkspace({ store, queue, watcher, accountId, ado
       store.set('workspaceAccount', accountId);
     } else {
       const current = { jobs: queue.snapshot(), channels: store.get('channels', []), catalogue: store.get('catalogue', null),
-        watches: watcher.watches, usage: queue.usage, currentBatchId: queue.currentBatchId };
+        recentSeries: store.get('recentSeries',[]), watches: watcher.watches, usage: queue.usage, currentBatchId: queue.currentBatchId };
       const next = store.get(`accountWorkspace:${accountId}`, blank());
+      next.recentSeries ||= [];
       next.jobs = next.jobs.map(job => ({ ...job, speed: 0,
         status: ['queued', 'retrying', 'downloading', 'checking', 'transferring'].includes(job.status) ? 'paused' : job.status }));
       // Archive before changing the active view, in one transaction.

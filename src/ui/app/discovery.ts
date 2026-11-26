@@ -8,7 +8,11 @@ import type { LibraryCatalogue } from "../features/library/types";
 interface Context { call: Call; dialogs: ReturnType<typeof createDialogs>; onJoined: (joined: JoinedChannel) => Promise<void>; onCatalogue: (catalogue:LibraryCatalogue) => void }
 export function createDiscovery({ call, dialogs, onJoined, onCatalogue }: Context) {
   let version = 0, busy = false;
-  function showSearch(source: DiscoverySource | null = null) { dialogs.show({ kind: "discovery-search", source }); }
+  let pendingQuery: string | undefined, pendingNotice: string | undefined;
+  function showSearch(source: DiscoverySource | null = null) {
+    if(!source) {pendingQuery=undefined;pendingNotice=undefined;}
+    dialogs.show({ kind: "discovery-search", source,query:pendingQuery,notice:pendingNotice });
+  }
   return {
     showSearch,
     invalidate() { const wasBusy = busy; version++; busy = false; return wasBusy; },
@@ -34,6 +38,7 @@ export function createDiscovery({ call, dialogs, onJoined, onCatalogue }: Contex
           },
         });
         if (!result || current !== version) return;
+        if(result.query) {pendingQuery=result.query;pendingNotice=result.notice;}
         if (result.expired) return dialogs.show({kind:"discovery-expired",notice:result.notice});
         if (result.catalogue) { dialogs.close(); return onCatalogue(result.catalogue); }
         if (result.joined) return await onJoined(result.joined);

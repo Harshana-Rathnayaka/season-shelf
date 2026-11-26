@@ -126,6 +126,11 @@ function connectionModal(): void | Promise<void> {
 async function chooseSeries(): Promise<void> {
   if(!state.connected && !state.demo)return connectionModal();
   dialogs.show({kind:"channels",channels:state.channels,demo:state.demo,filter:state.channelFilter,keywords:state.settings.hiddenKeywords??defaultHiddenKeywords,selectedMediaChannel:state.catalogue?.items.some(item=>!item.reason)?state.catalogue.channel.id:undefined});
+  if(!state.demo) {
+    const generation=dialogs.generation();
+    const recentSeries=await call("discovery-recent");
+    if(dialogs.generation()===generation) dialogs.update(view=>view.kind==='channels'?{...view,recentSeries}:view);
+  }
 }
 async function connect(payload: {apiId?:string;apiHash?:string;phone?:string}) {
   dialogs.show({kind:"message",title:"Connecting...",message:"Keep this window open. Telegram may ask for a login code or your two-step verification password."});
@@ -269,6 +274,8 @@ async function dispatchAction(action: string, data: DialogActionData & {page?: P
       await discovery.run("discovery-source",{groupId:data.choice});
     } else if (action === "discovery-follow") {
       await discovery.run("discovery-follow",{id:required(data.choice)});
+    } else if (action === "discovery-resume") {
+      await discovery.run("discovery-resume",{id:required(data.choice)});
     } else if (action === "discovery-join") {
       await discovery.run("discovery-join",{id:required(data.choice)});
     } else if (action === "scan-channel") await scan(required(data.channel));

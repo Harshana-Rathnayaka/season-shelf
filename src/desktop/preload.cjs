@@ -26,6 +26,8 @@ const allowed = new Set([
   "auth-reply",
   "channels",
   "discovery-search",
+  "discovery-recent",
+  "discovery-resume",
   "discovery-source",
   "discovery-open-message",
   "discovery-follow",

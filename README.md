@@ -40,6 +40,8 @@
 
 Download and Watch folders keep permanent and viewing copies separate. You decide when to delete files.
 
+Folder pickers reopen at the saved Download or Watch location, including after restarting the app. If that folder was removed, the picker starts at its nearest existing parent. Settings use switches for on/off preferences and visible radio choices for short option lists.
+
 On **Downloads → Ongoing**, enable **Shut down when downloads finish** for the current session. It waits for downloads, verification, file transfers and filename updates, then shows a 60-second countdown with **Cancel shutdown** on every page. Paused, failed and scheduled jobs keep it waiting; removing an unfinished job cancels it. The option resets when the app exits or you change accounts. Windows receives a normal shutdown request without forced application closure ([Microsoft command reference](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/shutdown)).
 
 <a id="get-started"></a>

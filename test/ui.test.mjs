@@ -665,11 +665,12 @@ test('empty and unverified-only channels keep quality, tab and search controls i
 test('download completion notifications default on and retain the saved preference',async t=>{
   const f=await fixture(t,{settings:{theme:'dark'},jobs:[],channels:[]},async(method,payload)=>method==='settings'?payload:{});
   f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
-  const select=f.document.querySelector('#download-complete-notifications');assert.equal(select.value,'on');
-  select.value='off';select.dispatchEvent(new f.window.Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,0));
+  const control=f.document.querySelector('#download-complete-notifications');assert.equal(control.checked,true);
+  assert.equal(control.getAttribute('role'),'switch');
+  control.click();await new Promise(r=>setTimeout(r,0));
   assert.equal(f.calls.find(c=>c.method==='settings').payload.downloadCompleteNotifications,false);
   f.click('[data-page="queue"]');f.click('[data-page="settings"]');
-  assert.equal(f.document.querySelector('#download-complete-notifications').value,'off');
+  assert.equal(f.document.querySelector('#download-complete-notifications').checked,false);
 });
 
 test('disabled schedule retains chosen hours and enabling it restores both time inputs',async t=>{
@@ -680,6 +681,56 @@ test('disabled schedule retains chosen hours and enabling it restores both time 
   const saved=f.calls.find(c=>c.method==='settings').payload.transfer;
   assert.equal(saved.start,'22:30');assert.equal(saved.end,'06:15');assert.equal(saved.scheduled,false);
   form=f.document.querySelector('#transfer-form');f.click('[name="scheduled"]');assert.equal(form.querySelector('.schedule-times').disabled,false);
+});
+
+test('settings switches prevent duplicate saves and recover their saved state after an error',async t=>{
+  let fail;
+  const f=await fixture(t,{settings:{theme:'dark',downloadCompleteNotifications:true},jobs:[],channels:[]},async method=>{
+    if(method==='settings')return new Promise((_,reject)=>{fail=reject;});
+    return {};
+  });
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  const control=f.document.querySelector('#download-complete-notifications');
+  control.click();control.click();await new Promise(r=>setTimeout(r,0));
+  assert.equal(control.disabled,true);
+  assert.equal(f.calls.filter(call=>call.method==='settings').length,1);
+  fail(Error('Could not save'));await new Promise(r=>setTimeout(r,20));
+  assert.equal(control.disabled,false);assert.equal(control.checked,true);
+  assert.match(f.document.querySelector('#toast').textContent,/Could not save/);
+});
+
+test('visible radio choices save concurrency and tray switch retains development restrictions',async t=>{
+  const f=await fixture(t,{environment:'development',settings:{theme:'dark',concurrency:2},jobs:[],channels:[]},async(method,payload)=>method==='settings'?payload:{});
+  f.click('[data-page="settings"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelectorAll('select').length,0);
+  assert.equal(f.document.querySelector('#close-behavior').disabled,true);
+  f.click('[name="concurrency"][value="3"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.find(call=>call.method==='settings').payload.concurrency,3);
+  assert.equal(f.document.querySelector('[name="concurrency"][value="3"]').checked,true);
+});
+
+test('series watch radio choices submit the selected behaviour',async t=>{
+  const item=parseEpisode({id:'1',filename:'Show.S01E01.720p.x265.mkv',size:1024});
+  const f=await fixture(t,{settings:{theme:'dark'},catalogue:{channel:{id:'show',title:'Show'},items:[item]},jobs:[],channels:[]},async()=>[]);
+  f.click('[data-action="watch-series"]');await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.document.querySelector('[name="watchMode"][value="off"]').checked,true);
+  f.click('[name="watchMode"][value="notify"]');
+  const form=f.document.querySelector('#watch-form');
+  form.dispatchEvent(new f.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));
+  assert.equal(f.calls.find(call=>call.method==='watch-set').payload.automatic,false);
+});
+
+test('appearance radios and automatic-colour switches preview changes before Apply',async t=>{
+  const f=await fixture(t);
+  f.click('[data-page="settings"]');
+  f.click('[name="size"][value="120"]');
+  assert.equal(f.document.documentElement.style.getPropertyValue('--font-scale'),'1.2');
+  const colour=f.document.querySelector('[name="accent"]');colour.value='#5533aa';
+  colour.dispatchEvent(new f.window.Event('input',{bubbles:true}));
+  assert.equal(f.document.querySelector('[name="autoAccent"]').checked,false);
+  f.click('[name="autoAccent"]');
+  assert.equal(f.document.documentElement.style.getPropertyValue('--primary'),'');
+  assert.equal(f.document.querySelector('[name="autoAccent"]').checked,true);
 });
 
 test('update check button shows loading until completion and displays the last check',async t=>{

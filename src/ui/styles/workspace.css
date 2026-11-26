@@ -309,6 +309,29 @@ strong, h1, h2, h3, .button, .episode-copy strong { font-weight:var(--strong-wei
 .transfer-footer { display:flex; align-items:center; flex-wrap:wrap; gap:16px; }
 @media(max-width:1100px) { .transfer-fields { grid-template-columns:1fr; gap:20px; } }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.switch-control { display:inline-flex; align-items:center; gap:10px; margin:0; flex-shrink:0; cursor:pointer; font-size:calc(13px * var(--font-scale,1)); color:var(--text); }
+.switch-control .switch-input { appearance:none; display:inline-block; position:relative; width:40px; height:24px; min-height:24px; padding:3px; margin:0; flex:0 0 40px; border:1px solid var(--border-strong); border-radius:999px; background:var(--subtle); cursor:pointer; transition:background .15s; }
+.switch-control .switch-input::before, .switch-control .switch-input:checked::before { content:""; display:block; position:absolute; left:3px; top:3px; width:16px; height:16px; border:0; border-radius:50%; background:var(--secondary); transform:translateX(0); transition:transform .15s; }
+.switch-control .switch-input:checked { background:var(--accent); border-color:var(--accent); }
+.switch-control .switch-input:checked::before { background:var(--accent-ink); transform:translateX(16px); }
+.switch-control:has(input:disabled) { opacity:.5; cursor:not-allowed; }
+.switch-control input:disabled { cursor:not-allowed; }
+.switch-state { min-width:22px; }
+.switch-input:checked ~ .switch-state > span:last-child, .switch-input:not(:checked) ~ .switch-state > span:first-child { display:none; }
+.radio-choices { padding:0; margin:0; border:0; min-width:0; max-width:100%; }
+.radio-choices legend { font-size:calc(13px * var(--font-scale,1)); color:var(--secondary); padding:0; margin-bottom:8px; }
+.radio-choices > div { display:flex; flex-wrap:wrap; gap:8px; }
+.radio-choices label, #dialog form .radio-choices label { display:inline-flex; align-items:center; gap:7px; margin:0; padding:8px 10px; border:1px solid var(--border-strong); border-radius:6px; color:var(--secondary); cursor:pointer; font-size:calc(13px * var(--font-scale,1)); }
+.radio-choices label:has(input:checked) { background:var(--accent-soft); border-color:var(--accent); color:var(--text); }
+.radio-choices label:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:3px; }
+.radio-choices input[type=radio], #dialog form .radio-choices input[type=radio] { appearance:auto; width:16px; height:16px; min-height:16px; padding:0; margin:0; flex:0 0 16px; accent-color:var(--accent); }
+.radio-choices:disabled { opacity:.5; }
+.radio-choices:disabled label { cursor:not-allowed; }
+.appearance-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.appearance-field > label { font-size:calc(13px * var(--font-scale,1)); }
+.appearance-grid .switch-control { display:inline-flex; margin-top:10px; gap:10px; }
+.appearance-grid .switch-control span, .appearance-grid .radio-choices span { display:inline; margin:0; }
+@media(max-width:640px) { .appearance-grid { grid-template-columns:1fr; } }
 .season-navigation[data-empty] { visibility:hidden; pointer-events:none; }
 .quality-area { min-height:44px; }
 

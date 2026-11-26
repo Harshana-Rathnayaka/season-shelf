@@ -1,5 +1,5 @@
 import type {DownloadsState,DownloadActionHandler} from '../types';
-import {AsyncActionButton} from '../../../shared/ui/AsyncActionButton';
+import {Switch} from '../../../shared/ui/Switch';
 
 export function ShutdownOption({state,onAction}:{state:DownloadsState;onAction:DownloadActionHandler}) {
   const status=state.shutdown,enabled=!!status?.enabled;
@@ -9,9 +9,9 @@ export function ShutdownOption({state,onAction}:{state:DownloadsState;onAction:D
     : status.message || 'Off by default. Enable for this queue; you get 60 seconds to cancel after every file is saved. Resets when the app exits.';
   return <section className="shutdown-option" aria-label="After downloads finish">
     <div><strong>Shut down when downloads finish</strong><p id="shutdown-description">{message}</p></div>
-    <AsyncActionButton label={enabled?'On':'Off'} aria-label="Shut down when downloads finish" role="switch" aria-checked={enabled}
-      aria-describedby="shutdown-description" className="button secondary shutdown-switch" data-action="shutdown-toggle"
+    <Switch label="Shut down when downloads finish" checked={enabled}
+      aria-describedby="shutdown-description" className="shutdown-switch" data-action="shutdown-toggle"
       disabled={state.demo || !status?.available || status.phase==='requested' || (!enabled && !pending)}
-      onAction={()=>onAction({action:'shutdown-toggle',enabled:!enabled})} />
+      onCheckedChange={async checked=>onAction({action:'shutdown-toggle',enabled:checked})} />
   </section>;
 }

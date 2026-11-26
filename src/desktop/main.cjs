@@ -305,7 +305,9 @@ app
     handle("choose-folder", async ({ mode }) => {
       if (!["archive", "watch"].includes(mode))
         throw new Error("Invalid destination mode");
+      const {folderPickerStart}=await import('./folder-picker.mjs');
       const result = await dialog.showOpenDialog(win, {
+        defaultPath:await folderPickerStart(settings,mode),
         title:
           mode === "archive"
             ? "Choose your download folder"

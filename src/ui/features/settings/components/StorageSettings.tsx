@@ -1,6 +1,8 @@
 import type { SettingsState, SettingsActionHandler, SaveSettings } from "../types";
 import { SettingsButton } from "./SettingsButton";
 import { TransferForm } from "./TransferForm";
+import { Switch } from '../../../shared/ui/Switch';
+import { RadioChoices } from '../../../shared/ui/RadioChoices';
 
 export function StorageSettings({ state, onSave, onAction }: { state: SettingsState; onSave: SaveSettings; onAction: SettingsActionHandler }) {
   const { settings } = state;
@@ -8,13 +10,13 @@ export function StorageSettings({ state, onSave, onAction }: { state: SettingsSt
     {(["archive", "watch"] as const).map(mode => <div className="setting-row" key={mode}><div><h3>{mode === "archive" ? "Download folder" : "Watch folder"}</h3><p>{settings[mode === "archive" ? "archiveRoot" : "watchRoot"]?.path || "No folder selected"}</p></div><SettingsButton label="Choose folder" glyph="folder" command={{ action: "folder", mode }} onAction={onAction} /></div>)}
     <TransferForm key={JSON.stringify(settings.transfer)} value={settings.transfer || {}} onSave={onSave} />
     <div className="setting-row"><div><h3>Simultaneous downloads</h3><p>Choose how many files can download at once.</p></div>
-      <select id="concurrency" aria-label="Simultaneous downloads" value={settings.concurrency || 2} onChange={event => { event.stopPropagation(); void onSave({ concurrency: Number(event.currentTarget.value) }); }}>{[1, 2, 3, 4].map(n => <option key={n}>{n}</option>)}</select>
+      <RadioChoices label="Simultaneous downloads" hideLabel name="concurrency" value={String(settings.concurrency || 2)} options={[1,2,3,4].map(n=>({value:String(n),label:String(n)}))} onValueChange={async value=>onSave({concurrency:Number(value)})} />
     </div>
     <div className="setting-row"><div><h3>Download complete notifications</h3><p>Show a desktop notification when downloads finish.</p></div>
-      <select id="download-complete-notifications" aria-label="Download complete notifications" value={settings.downloadCompleteNotifications !== false ? "on" : "off"} onChange={event => { event.stopPropagation(); void onSave({ downloadCompleteNotifications: event.currentTarget.value === "on" }); }}><option value="on">On</option><option value="off">Off</option></select>
+      <Switch id="download-complete-notifications" label="Download complete notifications" checked={settings.downloadCompleteNotifications !== false} onCheckedChange={async checked=>onSave({downloadCompleteNotifications:checked})} />
     </div>
-    <div className="setting-row"><div><h3>When closing the window</h3><p>{state.environment === "development" ? "Development mode exits when the window closes. Tray operation is available in installed builds." : "Downloads pause in both modes. File checks and transfers finish safely."}</p></div>
-      <select id="close-behavior" aria-label="When closing the window" disabled={state.environment === "development"} value={settings.closeToTray !== false && state.environment !== "development" ? "tray" : "quit"} onChange={event => { event.stopPropagation(); void onSave({ closeToTray: event.currentTarget.value === "tray" }); }}><option value="tray">Keep in system tray</option><option value="quit">Close the app</option></select>
+    <div className="setting-row"><div><h3>Keep app in system tray</h3><p>{state.environment === "development" ? "Development mode exits when the window closes. Tray operation is available in installed builds." : "When closing the window, keep the app in the tray. Turn off to quit. Downloads pause either way; file checks and transfers finish safely."}</p></div>
+      <Switch id="close-behavior" label="Keep app in system tray" disabled={state.environment === "development"} checked={settings.closeToTray !== false && state.environment !== "development"} onCheckedChange={async checked=>onSave({closeToTray:checked})} />
     </div>
   </section>;
 }

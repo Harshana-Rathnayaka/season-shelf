@@ -3,6 +3,8 @@ import { appearanceValues, previewAppearance } from "../appearance";
 import type { Settings, SaveSettings, SettingsActionHandler, Theme } from "../types";
 import { AsyncForm } from "../../../shared/ui/AsyncForm";
 import { SettingsButton } from "./SettingsButton";
+import { Switch } from '../../../shared/ui/Switch';
+import { RadioChoices } from '../../../shared/ui/RadioChoices';
 
 export function AppearanceSettings({ settings, onSave, onAction }: { settings: Settings; onSave: SaveSettings; onAction: SettingsActionHandler }) {
   const value = cleanAppearance(settings.appearance);
@@ -18,10 +20,10 @@ export function AppearanceSettings({ settings, onSave, onAction }: { settings: S
       onSave={form => onSave({ appearance: appearanceValues(form) }, "Appearance saved.")}>
       {pending => <><h3>Typography and colours</h3><p>Changes preview immediately. Apply to save them across the app.</p>
         <div className="appearance-grid">
-          <label>Text size<select name="size" defaultValue={value.size}>{[90, 100, 110, 120].map(size => <option key={size} value={size}>{size}%</option>)}</select></label>
-          <label>Text weight<select name="weight" defaultValue={value.weight}>{[[400, "Regular"], [500, "Medium"], [600, "Semibold"]].map(([weight, label]) => <option key={weight} value={weight}>{label}</option>)}</select></label>
-          <label>Accent colour<input name="accent" type="color" defaultValue={value.accent || (light ? "#0969da" : "#4493f8")} /><span><input name="autoAccent" type="checkbox" defaultChecked={!value.accent} /> Automatic</span></label>
-          <label>Text colour<input name="text" type="color" defaultValue={value.text || (light ? "#1f2328" : "#f0f6fc")} /><span><input name="autoText" type="checkbox" defaultChecked={!value.text} /> Automatic</span></label>
+          <RadioChoices label="Text size" name="size" defaultValue={String(value.size)} options={[90,100,110,120].map(size=>({value:String(size),label:`${size}%`}))} />
+          <RadioChoices label="Text weight" name="weight" defaultValue={String(value.weight)} options={[{value:'400',label:'Regular'},{value:'500',label:'Medium'},{value:'600',label:'Semibold'}]} />
+          <div className="appearance-field"><label htmlFor="accent-colour">Accent colour</label><input id="accent-colour" name="accent" type="color" defaultValue={value.accent || (light ? "#0969da" : "#4493f8")} /><Switch name="autoAccent" label="Automatic accent colour" text="Automatic" defaultChecked={!value.accent} /></div>
+          <div className="appearance-field"><label htmlFor="text-colour">Text colour</label><input id="text-colour" name="text" type="color" defaultValue={value.text || (light ? "#1f2328" : "#f0f6fc")} /><Switch name="autoText" label="Automatic text colour" text="Automatic" defaultChecked={!value.text} /></div>
         </div>
         <div className="row-actions"><button className="button primary" type="submit" disabled={pending}>Apply appearance</button><SettingsButton label="Reset appearance" command={{ action: "reset-appearance" }} onAction={onAction} /></div>
         <p>Custom text colour applies to both themes. Reset restores readable defaults.</p>

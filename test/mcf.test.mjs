@@ -46,6 +46,8 @@ test('MCF helper flow follows Sinhala menus, explicit quality and a second helpe
       return {};
     }};
   f=serviceFor(client);const {service}=f;
+  const recentData={};
+  service.store={get:(key,fallback)=>recentData[key] ?? fallback,set:(key,value)=>{recentData[key]=structuredClone(value);}};
   const {source}=await service.prepareSearch();
   let result=await service.search('The Flash',source.id);
   assert.equal(result.messages.length,1);assert.equal(result.messages[0].links[0].automatic,false);
@@ -64,6 +66,11 @@ test('MCF helper flow follows Sinhala menus, explicit quality and a second helpe
   assert.match(c.sourceWarning,/deleted/);
   assert.deepEqual(actions,['messages.GetBotCallbackAnswer','messages.GetBotCallbackAnswer','messages.GetBotCallbackAnswer','messages.StartBot']);
   assert.equal(service.operation,null);
+  const recent=recentData.recentSeries[0];
+  assert.equal(recent.title,'The Flash (2014)');assert.equal(recent.query,'The Flash');
+  assert.equal(recent.season,1);assert.equal(recent.resolution,1080);
+  assert.equal(recent.shortcut.peer.id,'99');assert.equal(recent.shortcut.messageId,11);
+  assert.equal(recent.searchPeer.id,'99');
 });
 
 test('private callback deliveries respect the pre-click message boundary',async()=>{

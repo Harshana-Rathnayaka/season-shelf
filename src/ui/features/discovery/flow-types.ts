@@ -4,10 +4,12 @@ export interface JoinedChannel { channel: Channel; channels: Channel[] }
 export interface DiscoveryResult {
   joined?: JoinedChannel; source?: DiscoverySource; groups?: Channel[]; channel?: Channel;
   notice?: string; messages?: DiscoveryMessage[];
+  query?: string;
   expired?:boolean;
   catalogue?: LibraryCatalogue;
 }
 export interface DiscoveryRequests {
+  "discovery-resume": { id: string };
   "discovery-source": { groupId?: string } | undefined;
   "discovery-search": { query: string; sourceId: string };
   "discovery-open-message": { link: string };

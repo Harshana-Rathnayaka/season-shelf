@@ -104,11 +104,14 @@ test('account switches isolate queues, channels, watches and usage without delet
   const id='12345678-1234-1234-1234-123456789012';
   f.queue.jobs=[{id,status:'paused',speed:42}];f.watcher.watches=[{channel:{id:'private-channel'}}];
   f.store.set('channels',[{id:'private-channel'}]);
+  f.store.set('recentSeries',[{id:'breaking-bad',title:'Breaking Bad'}]);
   await fs.writeFile(path.join(f.queue.staging,`${id}.part`),'partial bytes');
   const next=f.activate('2');assert.deepEqual(next.jobs,[]);assert.deepEqual(next.channels,[]);
   assert.equal(next.usage.payloadBytes,0);assert.deepEqual(f.watcher.watches,[]);
+  assert.deepEqual(f.store.get('recentSeries'),[]);
   assert.deepEqual(await orphanedPartials(f.queue),[],'inactive account partials are protected from cleanup');
   const original=f.activate('1');assert.equal(original.jobs[0].id,id);
+  assert.equal(f.store.get('recentSeries')[0].title,'Breaking Bad');
   assert.equal(original.usage.payloadBytes,12);assert.equal(f.watcher.watches[0].channel.id,'private-channel');
   assert.equal(await fs.readFile(path.join(f.queue.staging,`${id}.part`),'utf8'),'partial bytes');
 });

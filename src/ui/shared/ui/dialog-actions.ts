@@ -1,6 +1,6 @@
 export type DialogAction = "close-dialog" | "dialog-back" | "finish-onboarding" | "update-later" | "update-install"
   | "reconnect" | "use-login" | "forget-logins" | "discover" | "discovery-source"
-  | "discovery-group" | "discovery-follow" | "discovery-join" | "choose-series" | "scan-channel"
+  | "discovery-group" | "discovery-follow" | "discovery-join" | "discovery-resume" | "choose-series" | "scan-channel"
   | "refresh-channels" | "channel-filter" | "subscription-help" | "confirmation-reply" | "retry-naming" | "reveal-job" | "delete-job";
 export interface DialogActionData { id?: string; job?: string; choice?: string; channel?: string; response?: string; filter?: string }
 export type DialogActionHandler = (action: DialogAction, data?: DialogActionData) => Promise<void>;

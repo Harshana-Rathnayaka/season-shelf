@@ -38,7 +38,7 @@ const bootstrap = object({ settings: optional(settings), channels: optional(arra
   shutdown:optional(shutdown),
   connected: maybeBoolean, profile, currentBatchId: maybeText, restoringSession: maybeBoolean, connectionError: optional(nullable(text)),
   hasCredentials: maybeBoolean, firstRun: maybeBoolean, customTitleBar: maybeBoolean, appName: maybeText, version: maybeText, environment: maybeText });
-const discovery = object({ source: optional(object({ id: text, title: text, linked: maybeBoolean })), groups: optional(array(channel)), channel: optional(channel), notice: maybeText, expired:maybeBoolean, catalogue:optional(catalogue),
+const discovery = object({ query:maybeText, source: optional(object({ id: text, title: text, linked: maybeBoolean })), groups: optional(array(channel)), channel: optional(channel), notice: maybeText, expired:maybeBoolean, catalogue:optional(catalogue),
   messages: optional(array(object({ text, links: array(object({ id: text, label: text, hint:maybeText, kind: text, automatic: maybeBoolean })) }))) });
 const joined = object({ channel, channels: array(channel) });
 const watch = object({ channel, mode: oneOf("archive", "watch"), automatic: maybeBoolean, error: maybeText });
@@ -50,6 +50,8 @@ const suggestions = array(object({ id: text, apiId: loginId(), phone: text }));
 function loginId(): Schema<string | number> { return { parse: value => typeof value === "number" ? number.parse(value) : text.parse(value) }; }
 
 export const responses = {
+  "discovery-recent":array(object({id:text,title:text,season:maybeNumber,resolution:maybeNumber})),
+  "discovery-resume":discovery,
   "shutdown-set":shutdown,
   bootstrap, settings, channels: array(channel), scan: catalogue, connect: connection,
   "choose-folder": settings, "find-missing": jobs, enqueue: array(text),
@@ -67,6 +69,7 @@ export const responses = {
   "auth-reply": ignored, "finish-onboarding": ignored, disconnect: object({ connected: boolean, revoked: maybeBoolean }),
 };
 export interface Requests extends DownloadRequests {
+  "discovery-recent":undefined; "discovery-resume":{id:string};
   bootstrap: undefined; settings: Partial<Settings>; channels: undefined; scan: { id: string };
   connect: { apiId?: string; apiHash?: string; phone?: string }; "choose-folder": { mode: DestinationMode };
   "find-missing": { mode: DestinationMode }; enqueue: { ids: string[]; unverifiedIds: string[]; mode: DestinationMode; quality: QualitySelection };

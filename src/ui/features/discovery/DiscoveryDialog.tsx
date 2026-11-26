@@ -11,6 +11,7 @@ export function DiscoveryDialog({ view, onAction, onSubmit }: DialogCallbacks & 
   switch (view.kind) {
     case "channels": return <ChannelPicker view={view} onAction={onAction} />;
     case "discovery-search": return <><h2>Find your next series.</h2>
+      {view.notice && <p role="status">{view.notice}</p>}
       {view.source ? <><p>Your search will be posted in <strong>{view.source.title}</strong>{view.source.linked ? ", the discussion group linked to MovieClubFamily" : ""}. Other members can see it. The MCF helper bots reply in that group.</p>
         <AsyncForm id="discovery-form" onSave={form => { const field = (name: string) => (form.elements.namedItem(name) as HTMLInputElement).value; return onSubmit({ form: "discovery-form", values: { query: field("query"), sourceId: field("sourceId") } }); }}>
           {pending => <><input type="hidden" name="sourceId" value={view.source?.id} /><label>Series name<input name="query" defaultValue={view.query || ""} onKeyDown={event => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); if (!pending) event.currentTarget.form?.requestSubmit(); } }} required maxLength={120} placeholder="e.g. Breaking Bad" autoComplete="off" /></label><button className="button primary full" type="submit" disabled={pending}>Post search in this group</button></>}

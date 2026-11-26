@@ -11,15 +11,83 @@ import { messageText } from "../core/telegram-content.mjs";
 
 const messageFingerprint = message => JSON.stringify([messageText(message),discoveryLinks(message)]);
 const channelRecord = entity => ({id:String(entity.id),title:entity.title || "Series channel",peer:{id:String(entity.id),type:"channel",accessHash:String(entity.accessHash || 0)}});
+const savedPeer = peer => {
+  const type=/Channel$/.test(peer?.className) ? 'channel' : /Chat$/.test(peer?.className) ? 'chat' : /User$/.test(peer?.className) ? 'user' : null;
+  const id=peer?.channelId ?? peer?.chatId ?? peer?.userId ?? peer?.id;
+  return type && id!=null ? {type,id:String(id),accessHash:String(peer.accessHash || 0)} : null;
+};
+const restoredPeer = peer => peer.type==='channel' ? new Api.InputPeerChannel({channelId:bigInt(peer.id),accessHash:bigInt(peer.accessHash)})
+  : peer.type==='chat' ? new Api.InputPeerChat({chatId:bigInt(peer.id)})
+    : new Api.InputPeerUser({userId:bigInt(peer.id),accessHash:bigInt(peer.accessHash)});
 
 export class Discovery {
-  constructor(adapter, {wait = delay, now = Date.now, timeout = 15000, searchTimeout = 45000, deliveryTimeout = 120000} = {}) {
-    Object.assign(this,{adapter,wait,now,timeout,searchTimeout,deliveryTimeout});
+  constructor(adapter, {store, wait = delay, now = Date.now, timeout = 15000, searchTimeout = 45000, deliveryTimeout = 120000} = {}) {
+    Object.assign(this,{adapter,store,wait,now,timeout,searchTimeout,deliveryTimeout});
     this.choices = new Map();
     this.searchGroups = new Map();
   }
   cancel() { this.operation?.abort(); }
-  reset() { this.cancel(); this.choices.clear(); this.searchGroups.clear(); this.helperIds=null; this.searchSource=null; this.delivery=null; this.selection={}; this.manualFlow=false; this.resumeTarget=null; this.resumeSearch=null; }
+  reset() { this.cancel(); this.choices.clear(); this.searchGroups.clear(); this.helperIds=null; this.searchSource=null; this.delivery=null; this.selection={}; this.manualFlow=false; this.resumeTarget=null; this.resumeSearch=null; this.seriesShortcut=null; this.seriesStart=null; this.recentContext=null; }
+  recentSeries() {
+    this.adapter.requireClient();
+    return this.store?.get('recentSeries',[]).map(({id,title,season,resolution})=>({id,title,season,resolution})) || [];
+  }
+  rememberSeries(catalogue) {
+    if(!this.store || !catalogue?.items.length) return;
+    const title=catalogue.channel.title;
+    const id=title.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+    const previous=this.store.get('recentSeries',[]);
+    const context=this.recentContext || {};
+    const entry={...context,id,title,query:this.resumeSearch?.query || context.query || title,
+      searchPeer:savedPeer(this.resumeSearch?.source?.peer) || context.searchPeer,
+      season:catalogue.delivery.selection?.season,resolution:catalogue.delivery.selection?.resolution,
+      shortcut:this.seriesShortcut || context.shortcut,updatedAt:this.now()};
+    this.store.set('recentSeries',[entry,...previous.filter(item=>item.id!==id)].slice(0,12));
+  }
+  async resumeSeries(id) {
+    if(this.operation) throw new Error('Wait for the current search to stop');
+    const entry=this.store?.get('recentSeries',[]).find(item=>item.id===id);
+    if(!entry) throw new Error('This recent series is no longer available. Choose another series.');
+    this.recentContext=entry;this.seriesShortcut=entry.shortcut;
+    this.selection={title:entry.title};this.delivery=null;this.resumeSearch=null;this.resumeTarget=null;this.searchSource=null;this.seriesStart=entry.shortcut?.start || null;this.choices.clear();
+    const shortcut=entry.shortcut;
+    if(shortcut) {
+      try {
+        const result=await this.run(async(client,signal)=>{
+          const peer=shortcut.bot ? await this.bot(client,shortcut.bot) : restoredPeer(shortcut.peer);
+          if(shortcut.bot && String(peer.id)!==shortcut.peer.id) throw new Error('Saved bot identity changed. Request a fresh search.');
+          const messages=await client.getMessages(peer,{ids:[shortcut.messageId]});
+          signal.throwIfAborted();
+          const message=messages.find(item=>item?.id===shortcut.messageId && messageFingerprint(item)===shortcut.fingerprint && senderId(item)===shortcut.sender);
+          return message ? this.presentMessages([message],peer,{manual:true}) : null;
+        });
+        if(result && !result.expired) return result;
+        // A series-specific start link can regenerate a menu that the bot edited.
+        if(shortcut.start) {
+          const choice=randomUUID();
+          this.choices.set(choice,{...shortcut.start,selection:{title:entry.title},manual:true});
+          const result=await this.follow(choice);
+          if(result.catalogue) return result;
+          if(!result.expired && result.messages?.some(message=>message.links.length)) return result;
+        }
+      } catch(error) {
+        if(error.name==='AbortError') throw error;
+        if(!/MESSAGE_ID_INVALID|MSG_ID_INVALID|USERNAME_INVALID|USERNAME_NOT_OCCUPIED|CHANNEL_PRIVATE|CHANNEL_INVALID|PEER_ID_INVALID|deleted|expired|unavailable|no longer valid|Saved bot identity changed/i.test(error.errorMessage || error.message || '')) throw error;
+      }
+    }
+    return this.recentSearch(entry);
+  }
+  async recentSearch(entry=this.recentContext) {
+    if(!entry) throw new Error('Choose a recent series first.');
+    let groupId;
+    if(entry.searchPeer) {
+      groupId=randomUUID();
+      const client=this.adapter.requireClient(), peer=restoredPeer(entry.searchPeer);
+      this.searchGroups.set(groupId,{entity:{id:entry.searchPeer.id},peer,linked:false,client,expires:this.now()+300000});
+    }
+    const result=await this.prepareSearch(groupId);
+    return {...result,query:entry.query || entry.title,notice:'The saved bot menu is no longer available. Post a fresh search to choose another season.'};
+  }
   async run(work) {
     if (this.operation) throw new Error("Wait for the current search to stop");
     const controller = new AbortController();
@@ -81,6 +149,7 @@ export class Discovery {
       signal.throwIfAborted();
       this.choices.clear();
       this.selection = {title:query.trim()};
+      this.seriesShortcut=null;this.seriesStart=null;this.recentContext=null;
       this.delivery = null;
       this.resumeTarget = null;
       this.resumeSearch = {query:query.trim(),source};
@@ -92,6 +161,7 @@ export class Discovery {
   async openMessageLink(link) {
     const target = parseDiscoveryLink(link);
     if (target?.kind !== "private-message") throw new Error("Paste a private Telegram message link, such as https://t.me/c/123456/789");
+    this.seriesShortcut=null;this.seriesStart=null;this.recentContext=null;this.selection={};this.resumeSearch=null;
     return this.run((client,signal)=>this.readLinkedMessage(client,target,signal));
   }
   async readLinkedMessage(client,target,signal) {
@@ -132,6 +202,11 @@ export class Discovery {
   presentMessages(messages, peer, context = {}) {
     const expired=messages.find(message=>isExpiredSearchNotice(messageText(message)));
     if(expired)return this.expiredResult(messageText(expired));
+    const seasonMenu=messages.find(message=>discoveryLinks(message).some(link=>/\bSeason\s*\d{1,2}\b/i.test(link.label)));
+    if(seasonMenu && savedPeer(peer)) {
+      this.seriesShortcut={peer:savedPeer(peer),...(isMcfBot(peer.username) ? {bot:peer.username} : {}),sender:senderId(seasonMenu),messageId:seasonMenu.id,fingerprint:messageFingerprint(seasonMenu),
+        ...(this.seriesStart ? {start:this.seriesStart} : {})};
+    }
     this.choices.clear();
     const manual=context.manual || this.manualFlow || messages.some(message=>this.helperIds?.has(senderId(message)));
     if(manual)this.manualFlow=true;
@@ -212,6 +287,7 @@ export class Discovery {
       if(!catalogue)throw new Error('The delivered files were deleted or are unavailable. Request the season again.');
       catalogue.delivery.afterId=afterId;
       this.delivery={client,bot,afterId,selection:{...this.selection}};
+      this.rememberSeries(catalogue);
       this.choices.clear();
       return {catalogue};
     }
@@ -237,6 +313,9 @@ export class Discovery {
       }
       const delivery=this.delivery;
       if(!delivery || delivery.client!==client)throw new Error('Choose a season and quality in the MCF bot first.');
+      if(this.selection?.title!==delivery.selection?.title) {
+        this.seriesShortcut=null;this.seriesStart=null;this.recentContext=null;this.resumeSearch=null;
+      }
       this.selection={...delivery.selection};
       return this.responses(client,delivery.bot,delivery.afterId,signal);
     });
@@ -303,6 +382,7 @@ export class Discovery {
       }
       if (target.kind === "private-message") return this.readLinkedMessage(client,target,signal);
       if (target.kind === "bot-start") {
+        this.seriesStart=target.start ? {kind:'bot-start',username:target.username,start:target.start} : null;
         const bot = await this.bot(client,target.username);
         if(/^MCFHelper/i.test(target.username))this.manualFlow=true;
         const previous = await client.getMessages(bot,{limit:1});

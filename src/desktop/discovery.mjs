@@ -37,7 +37,7 @@ export class Discovery {
     const title=catalogue.channel.title;
     const id=title.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
     const previous=this.store.get('recentSeries',[]);
-    const context=this.recentContext || {};
+    const context=(this.recentContext?.id===id ? this.recentContext : previous.find(entry=>entry.id===id)) || {};
     const entry={...context,id,title,query:this.resumeSearch?.query || context.query || title,
       searchPeer:savedPeer(this.resumeSearch?.source?.peer) || context.searchPeer,
       season:catalogue.delivery.selection?.season,resolution:catalogue.delivery.selection?.resolution,

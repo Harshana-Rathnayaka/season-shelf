@@ -44,6 +44,13 @@ test('a restart restores the season menu with fresh choice IDs and no bot action
   assert.equal(restored.selection.title,'Breaking Bad (2008)');
 });
 
+test('rechecking a saved delivery after restart preserves its existing menu reference',()=>{
+  const f=fixture();f.remember();
+  const restored=f.create();
+  restored.rememberSeries({channel:{title:'Breaking Bad (2008)'},items:[{}],delivery:{selection:{season:3,resolution:720}}});
+  assert.equal(f.data.recentSeries[0].shortcut.messageId,42);
+});
+
 test('shared-group season menus restore their peer and validate the original sender',async()=>{
   const f=fixture();
   f.service.selection={title:'Breaking Bad (2008)'};

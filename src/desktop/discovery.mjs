@@ -27,7 +27,7 @@ export class Discovery {
     this.searchGroups = new Map();
   }
   cancel() { this.operation?.abort(); }
-  reset() { this.cancel(); this.choices.clear(); this.searchGroups.clear(); this.helperIds=null; this.searchSource=null; this.delivery=null; this.selection={}; this.manualFlow=false; this.resumeTarget=null; this.resumeSearch=null; this.seriesShortcut=null; this.seriesStart=null; this.recentContext=null; }
+  reset() { this.cancel(); this.choices.clear(); this.searchGroups.clear(); this.helperIds=null; this.searchSource=null; this.delivery=null; this.selection={}; this.manualFlow=false; this.resumeTarget=null; this.resumeSearch=null; this.seriesShortcut=null; this.recentContext=null; }
   recentSeries() {
     this.adapter.requireClient();
     return this.store?.get('recentSeries',[]).map(({id,title,season,resolution})=>({id,title,season,resolution})) || [];
@@ -37,7 +37,7 @@ export class Discovery {
     const title=catalogue.channel.title;
     const id=title.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
     const previous=this.store.get('recentSeries',[]);
-    const context=this.recentContext || {};
+    const context=(this.recentContext?.id===id ? this.recentContext : previous.find(entry=>entry.id===id)) || {};
     const entry={...context,id,title,query:this.resumeSearch?.query || context.query || title,
       searchPeer:savedPeer(this.resumeSearch?.source?.peer) || context.searchPeer,
       season:catalogue.delivery.selection?.season,resolution:catalogue.delivery.selection?.resolution,
@@ -49,30 +49,26 @@ export class Discovery {
     const entry=this.store?.get('recentSeries',[]).find(item=>item.id===id);
     if(!entry) throw new Error('This recent series is no longer available. Choose another series.');
     this.recentContext=entry;this.seriesShortcut=entry.shortcut;
-    this.selection={title:entry.title};this.delivery=null;this.resumeSearch=null;this.resumeTarget=null;this.searchSource=null;this.seriesStart=entry.shortcut?.start || null;this.choices.clear();
+    this.selection={...entry.shortcut?.selection,title:entry.title,season:entry.season};
+    delete this.selection.resolution;delete this.selection.expected;
+    this.delivery=null;this.resumeSearch=null;this.resumeTarget=null;this.searchSource=null;this.choices.clear();
     const shortcut=entry.shortcut;
     if(shortcut) {
       try {
         const result=await this.run(async(client,signal)=>{
+          // Reopen the message itself, exactly like pasting its Telegram link.
+          // Bot navigation edits its text and keyboard in place; those edits
+          // must not invalidate a saved chat/message reference.
+          if(shortcut.peer.type==='channel') return this.readLinkedMessage(client,
+            {channelId:shortcut.peer.id,messageId:shortcut.messageId},signal,{expectedSender:shortcut.sender,restoreSelection:true});
           const peer=shortcut.bot ? await this.bot(client,shortcut.bot) : restoredPeer(shortcut.peer);
           if(shortcut.bot && String(peer.id)!==shortcut.peer.id) throw new Error('Saved bot identity changed. Request a fresh search.');
-          const messages=await client.getMessages(peer,{ids:[shortcut.messageId]});
-          signal.throwIfAborted();
-          const message=messages.find(item=>item?.id===shortcut.messageId && messageFingerprint(item)===shortcut.fingerprint && senderId(item)===shortcut.sender);
-          return message ? this.presentMessages([message],peer,{manual:true}) : null;
+          return this.readMenuMessage(client,peer,shortcut.messageId,signal,{expectedSender:shortcut.sender,restoreSelection:true});
         });
         if(result && !result.expired) return result;
-        // A series-specific start link can regenerate a menu that the bot edited.
-        if(shortcut.start) {
-          const choice=randomUUID();
-          this.choices.set(choice,{...shortcut.start,selection:{title:entry.title},manual:true});
-          const result=await this.follow(choice);
-          if(result.catalogue) return result;
-          if(!result.expired && result.messages?.some(message=>message.links.length)) return result;
-        }
       } catch(error) {
         if(error.name==='AbortError') throw error;
-        if(!/MESSAGE_ID_INVALID|MSG_ID_INVALID|USERNAME_INVALID|USERNAME_NOT_OCCUPIED|CHANNEL_PRIVATE|CHANNEL_INVALID|PEER_ID_INVALID|deleted|expired|unavailable|no longer valid|Saved bot identity changed/i.test(error.errorMessage || error.message || '')) throw error;
+        if(!/MESSAGE_ID_INVALID|MSG_ID_INVALID|USERNAME_INVALID|USERNAME_NOT_OCCUPIED|CHANNEL_PRIVATE|CHANNEL_INVALID|PEER_ID_INVALID|deleted|expired|unavailable|no longer valid|Saved bot identity changed|sender changed|not available in your account|not accessible/i.test(error.errorMessage || error.message || '')) throw error;
       }
     }
     return this.recentSearch(entry);
@@ -149,7 +145,7 @@ export class Discovery {
       signal.throwIfAborted();
       this.choices.clear();
       this.selection = {title:query.trim()};
-      this.seriesShortcut=null;this.seriesStart=null;this.recentContext=null;
+      this.seriesShortcut=null;this.recentContext=null;
       this.delivery = null;
       this.resumeTarget = null;
       this.resumeSearch = {query:query.trim(),source};
@@ -161,10 +157,10 @@ export class Discovery {
   async openMessageLink(link) {
     const target = parseDiscoveryLink(link);
     if (target?.kind !== "private-message") throw new Error("Paste a private Telegram message link, such as https://t.me/c/123456/789");
-    this.seriesShortcut=null;this.seriesStart=null;this.recentContext=null;this.selection={};this.resumeSearch=null;
+    this.seriesShortcut=null;this.recentContext=null;this.selection={};this.resumeSearch=null;
     return this.run((client,signal)=>this.readLinkedMessage(client,target,signal));
   }
-  async readLinkedMessage(client,target,signal) {
+  async readLinkedMessage(client,target,signal,options={}) {
     signal.throwIfAborted();
     let peer;
     try { peer = await client.getInputEntity(new Api.PeerChannel({channelId:bigInt(target.channelId)})); }
@@ -181,18 +177,26 @@ export class Discovery {
     }
     signal.throwIfAborted();
     if (!peer) throw new Error("This private chat is not available in your account's recent dialogs. Open it in Telegram, then try again.");
+    return this.readMenuMessage(client,peer,target.messageId,signal,options);
+  }
+  async readMenuMessage(client,peer,messageId,signal,{expectedSender,restoreSelection=false}={}) {
     let messages;
-    try { messages = await client.getMessages(peer,{ids:[target.messageId]}); }
+    try { messages = await client.getMessages(peer,{ids:[messageId]}); }
     catch (error) {
       if (/CHANNEL_PRIVATE|CHANNEL_INVALID|MESSAGE_ID_INVALID/.test(error.errorMessage || error.message)) throw new Error("This message is unavailable or your account cannot access its private chat.");
       throw error;
     }
     signal.throwIfAborted();
-    const message = messages.find(item=>item?.id === target.messageId && item.className !== "MessageEmpty");
+    const message = messages.find(item=>item?.id === messageId && item.className !== "MessageEmpty");
     if (!message) throw new Error("The linked message was deleted or is not accessible to this account.");
+    if(expectedSender!==undefined && senderId(message)!==expectedSender) throw new Error('The saved message sender changed. Choose a fresh result.');
     if(!messageText(message).trim() && !discoveryLinks(message).length)
       throw new Error('Telegram returned this message without readable text or supported buttons. Its content format may be unsupported; open it in Telegram.');
-    return this.presentMessages([message],peer,{manual:true});
+    if(restoreSelection) {
+      const season=/\bSeason\s*(\d{1,2})\b/i.exec(messageText(message));
+      if(season) this.selection=updateSelection(this.selection,`Season ${season[1]}`);
+    }
+    return this.presentMessages([message],peer,{manual:true,queryId:message.replyTo?.replyToMsgId,botIds:senderId(message)?[senderId(message)]:undefined});
   }
   expiredResult(notice) {
     this.choices.clear();this.resumeTarget=null;this.resumeSearch=null;this.searchSource=null;
@@ -202,10 +206,15 @@ export class Discovery {
   presentMessages(messages, peer, context = {}) {
     const expired=messages.find(message=>isExpiredSearchNotice(messageText(message)));
     if(expired)return this.expiredResult(messageText(expired));
-    const seasonMenu=messages.find(message=>discoveryLinks(message).some(link=>/\bSeason\s*\d{1,2}\b/i.test(link.label)));
-    if(seasonMenu && savedPeer(peer)) {
-      this.seriesShortcut={peer:savedPeer(peer),...(isMcfBot(peer.username) ? {bot:peer.username} : {}),sender:senderId(seasonMenu),messageId:seasonMenu.id,fingerprint:messageFingerprint(seasonMenu),
-        ...(this.seriesStart ? {start:this.seriesStart} : {})};
+    const menu=!context.synthetic && messages.find(message=>discoveryLinks(message).some(link=>['callback','bot-start','private-message'].includes(link.target.kind)));
+    if(menu && savedPeer(peer)) {
+      this.seriesShortcut={peer:savedPeer(peer),...(isMcfBot(peer.username) ? {bot:peer.username} : {}),sender:senderId(menu),messageId:menu.id,selection:{...this.selection}};
+      // Keep an existing recent entry's place current even when a Back button
+      // creates a new message and the user closes before requesting files.
+      if(this.recentContext && this.store) {
+        this.recentContext={...this.recentContext,shortcut:this.seriesShortcut};
+        this.store.set('recentSeries',this.store.get('recentSeries',[]).map(entry=>entry.id===this.recentContext.id?{...entry,shortcut:this.seriesShortcut}:entry));
+      }
     }
     this.choices.clear();
     const manual=context.manual || this.manualFlow || messages.some(message=>this.helperIds?.has(senderId(message)));
@@ -314,7 +323,7 @@ export class Discovery {
       const delivery=this.delivery;
       if(!delivery || delivery.client!==client)throw new Error('Choose a season and quality in the MCF bot first.');
       if(this.selection?.title!==delivery.selection?.title) {
-        this.seriesShortcut=null;this.seriesStart=null;this.recentContext=null;this.resumeSearch=null;
+        this.seriesShortcut=null;this.recentContext=null;this.resumeSearch=null;
       }
       this.selection={...delivery.selection};
       return this.responses(client,delivery.bot,delivery.afterId,signal);
@@ -333,7 +342,10 @@ export class Discovery {
         const current = await client.getMessages(target.peer,{ids:[target.messageId]});
         signal.throwIfAborted();
         const stillPresent = current.some(message=>message.id === target.messageId && (!target.fingerprint || messageFingerprint(message)===target.fingerprint) && (!target.sender || senderId(message)===target.sender) && discoveryLinks(message).some(link=>link.target.kind === "callback" && JSON.stringify(link.target.data) === JSON.stringify(target.data)));
-        if (!stillPresent) throw new Error("This bot button changed. Search again for current results.");
+        if (!stillPresent) {
+          if(this.recentContext) return this.readMenuMessage(client,target.peer,target.messageId,signal,{expectedSender:target.sender,restoreSelection:true});
+          throw new Error("This bot button changed. Search again for current results.");
+        }
         const privateBot=target.peer.className==='User' && target.peer.bot;
         const beforeDelivery=privateBot ? await client.getMessages(target.peer,{limit:1}) : [];
         signal.throwIfAborted();
@@ -350,7 +362,7 @@ export class Discovery {
         if (answer.url) {
           const next = parseDiscoveryLink(answer.url);
           if (!next) throw new Error("The bot returned an unsupported link. Open this result in Telegram.");
-          return this.presentMessages([{id:target.messageId,message:answer.message || "",replyMarkup:{rows:[{buttons:[{text:"Continue to series",url:answer.url}]}]}}],target.peer);
+          return this.presentMessages([{id:target.messageId,message:answer.message || "",replyMarkup:{rows:[{buttons:[{text:"Continue to series",url:answer.url}]}]}}],target.peer,{synthetic:true});
         }
         if(answer.alert && answer.message) {
           const result=this.presentMessages(current,target.peer,{queryId:target.queryId,botIds:target.botIds});
@@ -382,7 +394,6 @@ export class Discovery {
       }
       if (target.kind === "private-message") return this.readLinkedMessage(client,target,signal);
       if (target.kind === "bot-start") {
-        this.seriesStart=target.start ? {kind:'bot-start',username:target.username,start:target.start} : null;
         const bot = await this.bot(client,target.username);
         if(/^MCFHelper/i.test(target.username))this.manualFlow=true;
         const previous = await client.getMessages(bot,{limit:1});
